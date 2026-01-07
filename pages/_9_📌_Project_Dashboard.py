@@ -328,14 +328,14 @@ with tab_keywords:
                 st.write("Paste keywords below (one per line):")
                 keywords_text = st.text_area(
                     "Keywords",
-                    placeholder="keyword 1\\nkeyword 2\\nkeyword 3",
+                    placeholder="keyword 1\nkeyword 2\nkeyword 3",
                     height=200,
                 )
 
                 submit = st.form_submit_button("Add Keywords", disabled=not can_edit)
 
                 if submit and keywords_text:
-                    keywords_list = [kw.strip() for kw in keywords_text.split("\\n") if kw.strip()]
+                    keywords_list = [kw.strip() for kw in keywords_text.splitlines() if kw.strip()]
 
                     if keywords_list:
                         count = create_keywords_bulk(project_id, keywords_list)
