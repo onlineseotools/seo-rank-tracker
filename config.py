@@ -21,6 +21,11 @@ GOOGLE_OAUTH_TOKEN_PATH = RUNTIME_DIR / "google_oauth_token.json"
 GSC_TOKEN_PATH = RUNTIME_DIR / "gsc_token.pickle"
 OAUTH_REDIRECT_URI = os.getenv("OAUTH_REDIRECT_URI")
 
+# Legacy credential locations (pre-cloud)
+LEGACY_CREDENTIALS_DIR = BASE_DIR / "credentials"
+LEGACY_GOOGLE_CREDENTIALS_PATH = LEGACY_CREDENTIALS_DIR / "google_service_account.json"
+LEGACY_GOOGLE_OAUTH_CLIENT_PATH = LEGACY_CREDENTIALS_DIR / "google_oauth_client.json"
+
 # Default app password (should be changed in settings)
 DEFAULT_APP_PASSWORD = "admin123"
 DEFAULT_APP_USERNAME = "admin"

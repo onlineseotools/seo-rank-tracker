@@ -12,6 +12,7 @@ import config
 from database.models import add_sync_log
 import json
 from pathlib import Path
+import shutil
 
 
 SCOPES = [
@@ -83,13 +84,21 @@ def _build_oauth_flow(client_secrets_path: str = None, redirect_uri: str = None)
     if client_secrets_path is None:
         client_secrets_path = str(config.GOOGLE_OAUTH_CLIENT_PATH)
 
-    if not client_secrets_path or not Path(client_secrets_path).exists():
+    if not client_secrets_path:
         raise FileNotFoundError("OAuth client secrets file not found.")
 
-    _load_oauth_client_info(Path(client_secrets_path))
+    client_path = Path(client_secrets_path)
+    if not client_path.exists() and config.LEGACY_GOOGLE_OAUTH_CLIENT_PATH.exists():
+        client_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(config.LEGACY_GOOGLE_OAUTH_CLIENT_PATH, client_path)
+
+    if not client_path.exists():
+        raise FileNotFoundError("OAuth client secrets file not found.")
+
+    _load_oauth_client_info(client_path)
 
     flow = InstalledAppFlow.from_client_secrets_file(
-        client_secrets_path, SCOPES
+        str(client_path), SCOPES
     )
     if redirect_uri:
         flow.redirect_uri = redirect_uri
@@ -178,6 +187,10 @@ def get_sheets_client(credentials_path: str = None):
 
     if credentials_path is None:
         credentials_path = config.GOOGLE_CREDENTIALS_PATH
+
+    if not credentials_path.exists() and config.LEGACY_GOOGLE_CREDENTIALS_PATH.exists():
+        credentials_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(config.LEGACY_GOOGLE_CREDENTIALS_PATH, credentials_path)
 
     if not credentials_path.exists():
         raise FileNotFoundError(

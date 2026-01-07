@@ -6,6 +6,7 @@ from google.auth.transport.requests import Request
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from pathlib import Path
+import shutil
 import pickle
 import os
 import config
@@ -25,11 +26,19 @@ def _build_gsc_flow(client_secrets_path: str = None, redirect_uri: str = None):
     if client_secrets_path is None:
         client_secrets_path = str(config.GOOGLE_OAUTH_CLIENT_PATH)
 
-    if not client_secrets_path or not Path(client_secrets_path).exists():
+    if not client_secrets_path:
+        raise FileNotFoundError("Client secrets file not found.")
+
+    client_path = Path(client_secrets_path)
+    if not client_path.exists() and config.LEGACY_GOOGLE_OAUTH_CLIENT_PATH.exists():
+        client_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(config.LEGACY_GOOGLE_OAUTH_CLIENT_PATH, client_path)
+
+    if not client_path.exists():
         raise FileNotFoundError("Client secrets file not found.")
 
     flow = InstalledAppFlow.from_client_secrets_file(
-        client_secrets_path, SCOPES
+        str(client_path), SCOPES
     )
     if redirect_uri:
         flow.redirect_uri = redirect_uri
