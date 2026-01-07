@@ -13,7 +13,17 @@ from database.models import (
     user_can_edit_project as _user_can_edit_project,
 )
 from components.modern_ui import load_custom_css, render_app_footer
+from database.db import init_database, seed_initial_data
 import config
+
+
+def _ensure_db_ready():
+    """Initialize database once per session."""
+    if st.session_state.get("db_ready"):
+        return
+    init_database()
+    seed_initial_data()
+    st.session_state["db_ready"] = True
 
 
 def _build_auth_token(user_id: int, password_hash: str) -> str:
@@ -36,6 +46,7 @@ def _get_auth_query_token() -> str | None:
 
 def check_authentication() -> bool:
     """Check if user is authenticated"""
+    _ensure_db_ready()
     users = list_users(include_inactive=False, include_password_hash=True)
     token = _get_auth_query_token()
 
