@@ -1015,6 +1015,35 @@ div[data-testid="stMetric"] {
     color: var(--text-primary) !important;
 }
 
+button[kind="primary"] {
+    border-radius: 0 !important;
+    padding: 0.6rem 1.2rem !important;
+    font-weight: 600 !important;
+    border: 1px solid rgba(63, 219, 116, 0.2) !important;
+    background: var(--accent) !important;
+    color: #ffffff !important;
+    min-height: 42px !important;
+    line-height: 1.1 !important;
+    box-shadow: 0 6px 14px rgba(63, 219, 116, 0.25) !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+button[kind="primary"]:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 10px 20px rgba(63, 219, 116, 0.3) !important;
+}
+
+button[kind="secondary"] {
+    border-radius: 0 !important;
+    padding: 0.6rem 1.2rem !important;
+    border: 1px solid var(--border) !important;
+    background: var(--bg-elev-2) !important;
+    color: var(--text-primary) !important;
+    min-height: 42px !important;
+    line-height: 1.1 !important;
+    box-shadow: none !important;
+}
+
 /* Inputs */
 .stSelectbox > div > div,
 .stTextInput > div > div > input,
@@ -1164,6 +1193,52 @@ div[data-testid="stMultiSelect"] [role="combobox"] * {
     background: #353f55 !important;
 }
 
+[data-testid="stDataFrame"],
+[data-testid="stTable"] {
+    background: var(--bg-elev) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 0 !important;
+    overflow: hidden !important;
+}
+
+[data-testid="stDataFrame"] table,
+[data-testid="stTable"] table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+}
+
+[data-testid="stDataFrame"] thead tr,
+[data-testid="stTable"] thead tr {
+    background: var(--bg-elev-3) !important;
+}
+
+[data-testid="stDataFrame"] thead th,
+[data-testid="stTable"] thead th {
+    color: var(--text-soft) !important;
+    font-size: 0.75rem !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    padding: 0.75rem !important;
+    border-bottom: 1px solid var(--border) !important;
+}
+
+[data-testid="stDataFrame"] tbody td,
+[data-testid="stTable"] tbody td {
+    color: var(--text-primary) !important;
+    padding: 0.7rem 0.9rem !important;
+    border-bottom: 1px solid var(--border) !important;
+}
+
+[data-testid="stDataFrame"] tbody tr:nth-child(even),
+[data-testid="stTable"] tbody tr:nth-child(even) {
+    background: #2d3548 !important;
+}
+
+[data-testid="stDataFrame"] tbody tr:hover,
+[data-testid="stTable"] tbody tr:hover {
+    background: #353f55 !important;
+}
+
 /* Alerts */
 .stAlert {
     border-radius: 0 !important;
@@ -1194,6 +1269,24 @@ div[data-testid="stMultiSelect"] [role="combobox"] * {
 }
 
 .streamlit-expanderContent {
+    background: var(--bg-elev) !important;
+    border: 1px solid var(--border) !important;
+    border-top: none !important;
+    border-radius: 0 !important;
+}
+
+[data-testid="stExpander"] details > summary {
+    background: var(--bg-elev-2) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 0 !important;
+    color: var(--text-primary) !important;
+}
+
+[data-testid="stExpander"] details > summary:hover {
+    background: var(--bg-elev-3) !important;
+}
+
+[data-testid="stExpander"] details > div {
     background: var(--bg-elev) !important;
     border: 1px solid var(--border) !important;
     border-top: none !important;

@@ -79,6 +79,47 @@ def _save_oauth_credentials(creds, token_path):
     token_path.write_text(creds.to_json(), encoding="utf-8")
 
 
+def _build_oauth_flow(client_secrets_path: str = None, redirect_uri: str = None):
+    if client_secrets_path is None:
+        client_secrets_path = str(config.GOOGLE_OAUTH_CLIENT_PATH)
+
+    if not client_secrets_path or not Path(client_secrets_path).exists():
+        raise FileNotFoundError("OAuth client secrets file not found.")
+
+    _load_oauth_client_info(Path(client_secrets_path))
+
+    flow = InstalledAppFlow.from_client_secrets_file(
+        client_secrets_path, SCOPES
+    )
+    if redirect_uri:
+        flow.redirect_uri = redirect_uri
+    return flow
+
+
+def get_sheets_auth_url(client_secrets_path: str = None, redirect_uri: str = None, state: str = None):
+    """Return OAuth consent URL and state for Google Sheets."""
+    flow = _build_oauth_flow(client_secrets_path, redirect_uri)
+    auth_url, state = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",
+        state=state,
+    )
+    return auth_url, state
+
+
+def exchange_sheets_auth_code(code: str, client_secrets_path: str = None, redirect_uri: str = None):
+    """Exchange OAuth code for credentials and persist the token."""
+    if not code:
+        raise ValueError("Authorization code is required.")
+
+    flow = _build_oauth_flow(client_secrets_path, redirect_uri)
+    flow.fetch_token(code=code)
+    creds = flow.credentials
+    _save_oauth_credentials(creds, config.GOOGLE_OAUTH_TOKEN_PATH)
+    return creds
+
+
 def get_oauth_credentials(token_path=None):
     """Load OAuth credentials for Google Sheets."""
     if token_path is None:

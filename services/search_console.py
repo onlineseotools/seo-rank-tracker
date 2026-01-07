@@ -5,12 +5,59 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
+from pathlib import Path
 import pickle
 import os
+import config
 
 
 SCOPES = ['https://www.googleapis.com/auth/webmasters.readonly']
 TOKEN_PATH = 'credentials/gsc_token.pickle'
+
+
+def _save_gsc_credentials(creds):
+    os.makedirs('credentials', exist_ok=True)
+    with open(TOKEN_PATH, 'wb') as token:
+        pickle.dump(creds, token)
+
+
+def _build_gsc_flow(client_secrets_path: str = None, redirect_uri: str = None):
+    if client_secrets_path is None:
+        client_secrets_path = str(config.GOOGLE_OAUTH_CLIENT_PATH)
+
+    if not client_secrets_path or not Path(client_secrets_path).exists():
+        raise FileNotFoundError("Client secrets file not found.")
+
+    flow = InstalledAppFlow.from_client_secrets_file(
+        client_secrets_path, SCOPES
+    )
+    if redirect_uri:
+        flow.redirect_uri = redirect_uri
+    return flow
+
+
+def get_gsc_auth_url(client_secrets_path: str = None, redirect_uri: str = None, state: str = None):
+    """Return OAuth consent URL and state for Google Search Console."""
+    flow = _build_gsc_flow(client_secrets_path, redirect_uri)
+    auth_url, state = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",
+        state=state,
+    )
+    return auth_url, state
+
+
+def exchange_gsc_auth_code(code: str, client_secrets_path: str = None, redirect_uri: str = None):
+    """Exchange OAuth code for credentials and persist the token."""
+    if not code:
+        raise ValueError("Authorization code is required.")
+
+    flow = _build_gsc_flow(client_secrets_path, redirect_uri)
+    flow.fetch_token(code=code)
+    creds = flow.credentials
+    _save_gsc_credentials(creds)
+    return creds
 
 
 def get_gsc_credentials():
@@ -47,21 +94,9 @@ def initiate_gsc_auth(client_secrets_path: str = None):
     Returns:
         OAuth flow object
     """
-    if not client_secrets_path or not os.path.exists(client_secrets_path):
-        raise FileNotFoundError("Client secrets file not found")
-
-    flow = InstalledAppFlow.from_client_secrets_file(
-        client_secrets_path, SCOPES
-    )
-
-    # Run local server for OAuth
+    flow = _build_gsc_flow(client_secrets_path)
     creds = flow.run_local_server(port=0)
-
-    # Save credentials
-    os.makedirs('credentials', exist_ok=True)
-    with open(TOKEN_PATH, 'wb') as token:
-        pickle.dump(creds, token)
-
+    _save_gsc_credentials(creds)
     return creds
 
 

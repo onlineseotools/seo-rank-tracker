@@ -12,6 +12,7 @@ DATABASE_PATH = BASE_DIR / "data" / "seo_tracker.db"
 GOOGLE_CREDENTIALS_PATH = BASE_DIR / "credentials" / "google_service_account.json"
 GOOGLE_OAUTH_CLIENT_PATH = BASE_DIR / "credentials" / "google_oauth_client.json"
 GOOGLE_OAUTH_TOKEN_PATH = BASE_DIR / "credentials" / "google_oauth_token.json"
+OAUTH_REDIRECT_URI = os.getenv("OAUTH_REDIRECT_URI")
 
 # Default app password (should be changed in settings)
 DEFAULT_APP_PASSWORD = "admin123"

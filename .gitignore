@@ -47,6 +47,8 @@ credentials/*.pickle
 
 # Streamlit
 .streamlit/
+!.streamlit/
+!.streamlit/config.toml
 
 # Logs
 *.log

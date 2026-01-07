@@ -1,6 +1,7 @@
 """Settings page - Configure API keys and app settings"""
 import streamlit as st
 import json
+import uuid
 from components.auth import require_admin, get_current_user, handle_user_menu, logout
 from components.modern_ui import (
     load_custom_css, render_header_with_subtitle, section_panel,
@@ -12,9 +13,15 @@ from services.google_sheets import (
     test_sheets_connection,
     REQUIRED_SERVICE_ACCOUNT_FIELDS,
     initiate_sheets_oauth,
-    get_oauth_credentials
+    get_oauth_credentials,
+    get_sheets_auth_url,
+    exchange_sheets_auth_code
 )
-from services.search_console import test_gsc_connection
+from services.search_console import (
+    test_gsc_connection,
+    get_gsc_auth_url,
+    exchange_gsc_auth_code
+)
 from components.tables import display_sync_log_table
 import config
 
@@ -28,6 +35,72 @@ load_custom_css()
 render_sidebar_projects(active_only=False)
 
 current_user = get_current_user()
+
+
+def _get_query_param(name: str):
+    value = st.query_params.get(name)
+    if isinstance(value, list):
+        return value[0] if value else None
+    return value
+
+
+def _clear_oauth_params():
+    params = dict(st.query_params)
+    for key in ("code", "state", "scope", "authuser", "prompt"):
+        params.pop(key, None)
+    st.query_params.clear()
+    for key, value in params.items():
+        st.query_params[key] = value
+
+
+def _consume_oauth_code():
+    code = _get_query_param("code")
+    state = _get_query_param("state")
+    error = _get_query_param("error")
+    if error:
+        st.error(f"OAuth error: {error}")
+        _clear_oauth_params()
+        st.session_state.pop("pending_oauth_provider", None)
+        st.session_state.pop("pending_oauth_state", None)
+        return
+
+    if not code or not state:
+        return
+
+    pending = st.session_state.get("pending_oauth_provider")
+    expected_state = st.session_state.get("pending_oauth_state")
+    derived_provider = None
+    if isinstance(state, str):
+        if state.startswith("sheets:"):
+            derived_provider = "sheets"
+        elif state.startswith("gsc:"):
+            derived_provider = "gsc"
+    redirect_uri = config.OAUTH_REDIRECT_URI
+
+    if pending and expected_state and state != expected_state:
+        return
+
+    if not pending:
+        pending = derived_provider
+
+    if not pending:
+        return
+
+    try:
+        if pending == "sheets":
+            exchange_sheets_auth_code(code, redirect_uri=redirect_uri)
+            st.success("Google Sheets OAuth connected.")
+        elif pending == "gsc":
+            exchange_gsc_auth_code(code, redirect_uri=redirect_uri)
+            st.success("Google Search Console OAuth connected.")
+    except Exception as exc:
+        st.error(str(exc))
+    finally:
+        st.session_state.pop("pending_oauth_provider", None)
+        st.session_state.pop("pending_oauth_state", None)
+        st.session_state.pop("pending_oauth_url", None)
+        _clear_oauth_params()
+        st.rerun()
 action = render_header_with_subtitle(
     "Settings",
     "Configure API keys, integrations, and app preferences",
@@ -36,6 +109,8 @@ action = render_header_with_subtitle(
     menu_key="settings"
 )
 handle_user_menu(action)
+
+_consume_oauth_code()
 
 # Tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -215,11 +290,31 @@ with tab2:
             with col2:
                 if st.button("Connect with Google", key="connect_sheets_oauth", use_container_width=True):
                     try:
-                        with st.spinner("Opening browser for authorization..."):
-                            initiate_sheets_oauth(str(config.GOOGLE_OAUTH_CLIENT_PATH))
-                        st.success("OAuth connected")
+                        redirect_uri = config.OAUTH_REDIRECT_URI
+                        if redirect_uri:
+                            state_token = f"sheets:{uuid.uuid4().hex}"
+                            auth_url, state = get_sheets_auth_url(
+                                redirect_uri=redirect_uri,
+                                state=state_token
+                            )
+                            st.session_state["pending_oauth_provider"] = "sheets"
+                            st.session_state["pending_oauth_state"] = state
+                            st.session_state["pending_oauth_url"] = auth_url
+                            st.info("Open the authorization link to finish OAuth.")
+                        else:
+                            with st.spinner("Opening browser for authorization..."):
+                                initiate_sheets_oauth(str(config.GOOGLE_OAUTH_CLIENT_PATH))
+                            st.success("OAuth connected")
                     except Exception as exc:
                         st.error(str(exc))
+
+            pending_url = st.session_state.get("pending_oauth_url")
+            if st.session_state.get("pending_oauth_provider") == "sheets" and pending_url:
+                st.link_button("Authorize Google", pending_url, use_container_width=True)
+                if config.OAUTH_REDIRECT_URI:
+                    st.caption(f"Redirect URI: {config.OAUTH_REDIRECT_URI}")
+                else:
+                    st.caption("Set OAUTH_REDIRECT_URI to enable cloud OAuth.")
 
             oauth_creds = get_oauth_credentials()
             if oauth_creds:
@@ -293,17 +388,57 @@ with tab2:
 with tab3:
     with section_panel("Google Search Console Configuration", "", "Connect to Google Search Console for organic search data"):
         render_info_box(
-            "Search Console requires OAuth authentication. Place client_secrets.json in the credentials folder.",
+            "Search Console requires OAuth authentication. Upload OAuth client secrets and connect your account.",
             "info"
         )
+
+        if config.GOOGLE_OAUTH_CLIENT_PATH.exists():
+            st.success("OAuth client secrets file found.")
+        else:
+            st.warning("Upload OAuth client secrets in the Google Sheets tab.")
 
         col1, col2 = st.columns([3, 1], vertical_alignment="bottom")
 
         with col1:
-            st.write("Test your GSC OAuth connection")
+            st.write("Connect your Google account for Search Console access.")
 
         with col2:
-            if st.button("Test Connection", key="test_gsc", type="primary", use_container_width=True):
+            if st.button("Connect Search Console", key="connect_gsc_oauth", type="primary", use_container_width=True):
+                try:
+                    redirect_uri = config.OAUTH_REDIRECT_URI
+                    if redirect_uri:
+                        state_token = f"gsc:{uuid.uuid4().hex}"
+                        auth_url, state = get_gsc_auth_url(
+                            redirect_uri=redirect_uri,
+                            state=state_token
+                        )
+                        st.session_state["pending_oauth_provider"] = "gsc"
+                        st.session_state["pending_oauth_state"] = state
+                        st.session_state["pending_oauth_url"] = auth_url
+                        st.info("Open the authorization link to finish OAuth.")
+                    else:
+                        with st.spinner("Opening browser for authorization..."):
+                            from services.search_console import initiate_gsc_auth
+                            initiate_gsc_auth(str(config.GOOGLE_OAUTH_CLIENT_PATH))
+                        st.success("OAuth connected")
+                except Exception as exc:
+                    st.error(str(exc))
+
+        pending_url = st.session_state.get("pending_oauth_url")
+        if st.session_state.get("pending_oauth_provider") == "gsc" and pending_url:
+            st.link_button("Authorize Google", pending_url, use_container_width=True)
+            if config.OAUTH_REDIRECT_URI:
+                st.caption(f"Redirect URI: {config.OAUTH_REDIRECT_URI}")
+            else:
+                st.caption("Set OAUTH_REDIRECT_URI to enable cloud OAuth.")
+
+        col3, col4 = st.columns([3, 1], vertical_alignment="bottom")
+
+        with col3:
+            st.write("Test your GSC OAuth connection")
+
+        with col4:
+            if st.button("Test Connection", key="test_gsc", type="secondary", use_container_width=True):
                 with st.spinner("Testing..."):
                     result = test_gsc_connection()
 
