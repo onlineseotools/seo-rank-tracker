@@ -165,6 +165,7 @@ def check_authentication() -> bool:
             _consume_oauth_callback()
             return True
 
+    _consume_oauth_callback()
     return False
 
 
