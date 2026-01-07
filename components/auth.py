@@ -115,7 +115,6 @@ def _consume_oauth_callback():
 def check_authentication() -> bool:
     """Check if user is authenticated"""
     _ensure_db_ready()
-    _consume_oauth_callback()
     users = list_users(include_inactive=False, include_password_hash=True)
     token = _get_auth_query_token() or _get_auth_token_from_state()
 
@@ -129,6 +128,7 @@ def check_authentication() -> bool:
                     st.query_params["auth"] = expected_token
                 except Exception:
                     pass
+            _consume_oauth_callback()
             return True
         st.session_state.authenticated = False
 
@@ -145,6 +145,7 @@ def check_authentication() -> bool:
                     st.query_params["auth"] = expected_token
                 except Exception:
                     pass
+                _consume_oauth_callback()
                 return True
     # Fallback to legacy settings-based auth when no users exist
     if not users:
@@ -161,6 +162,7 @@ def check_authentication() -> bool:
                 st.query_params["auth"] = expected_token
             except Exception:
                 pass
+            _consume_oauth_callback()
             return True
 
     return False
