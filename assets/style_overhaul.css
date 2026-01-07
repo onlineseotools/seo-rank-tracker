@@ -74,7 +74,11 @@ body {
     max-width: 1500px !important;
 }
 
-.st-emotion-cache-tn0cau {
+[data-testid="stAppViewContainer"] > .main {
+    gap: 0 !important;
+}
+
+.block-container > div[data-testid="stVerticalBlock"] {
     gap: 0.1rem !important;
 }
 
@@ -84,10 +88,6 @@ footer, #MainMenu {
 
 [data-testid="stLayoutWrapper"] {
     padding-bottom: 0.3rem !important;
-}
-
-.st-emotion-cache-1n6tfoc {
-    gap: 0 !important;
 }
 
 header {
@@ -524,10 +524,10 @@ div[data-testid="stVerticalBlock"]:has(.sub-panel-marker):not(:has(div[data-test
 }
 
 div[data-testid="stVerticalBlock"]:has(.section-panel-marker):not(:has(div[data-testid="stVerticalBlock"] .section-panel-marker)) {
-    background: transparent;
-    border: 1px solid var(--border);
-    padding: 1.2rem;
-    margin: 0;
+    background: transparent !important;
+    border: 1px solid var(--border) !important;
+    padding: 1.2rem !important;
+    margin: 0 !important;
     box-shadow:
         0 6px 14px rgba(0, 0, 0, 0.2),
         inset 0 1px 0 rgba(255, 255, 255, 0.02);
@@ -554,7 +554,7 @@ div[data-testid="stVerticalBlock"]:has(.section-panel-marker):not(:has(div[data-
 }
 
 div[data-testid="stVerticalBlock"]:has(.section-panel-marker):not(:has(div[data-testid="stVerticalBlock"] .section-panel-marker)) > div {
-    margin-bottom: 0;
+    margin-bottom: 0 !important;
 }
 
 div[data-testid="stVerticalBlock"]:has(.section-panel-marker):not(:has(div[data-testid="stVerticalBlock"] .section-panel-marker)) > div:last-child {
@@ -565,7 +565,7 @@ div[data-testid="stVerticalBlock"]:has(.section-panel-marker):not(:has(div[data-
     margin-bottom: 0 !important;
 }
 
-.st-emotion-cache-upp7qo {
+div[data-testid="stMetric"] {
     margin-bottom: 0 !important;
 }
 
