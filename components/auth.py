@@ -44,16 +44,37 @@ def _get_auth_query_token() -> str | None:
     return token
 
 
+def _get_auth_token_from_state() -> str | None:
+    """Extract auth token embedded in OAuth state."""
+    try:
+        params = st.query_params
+    except Exception:
+        return None
+    state = params.get("state")
+    if isinstance(state, list):
+        state = state[0] if state else None
+    if not state or "|" not in state:
+        return None
+    parts = state.split("|")
+    if len(parts) < 3:
+        return None
+    if parts[0] not in ("sheets", "gsc"):
+        return None
+    token = parts[1].strip()
+    return token or None
+
+
 def check_authentication() -> bool:
     """Check if user is authenticated"""
     _ensure_db_ready()
     users = list_users(include_inactive=False, include_password_hash=True)
-    token = _get_auth_query_token()
+    token = _get_auth_query_token() or _get_auth_token_from_state()
 
     if st.session_state.get("authenticated", False) and st.session_state.get("user_id"):
         user = get_user_by_id(st.session_state.get("user_id"))
         if user and user.get("is_active"):
             expected_token = _build_auth_token(user["id"], user["password_hash"])
+            st.session_state["auth_token"] = expected_token
             if token != expected_token:
                 try:
                     st.query_params["auth"] = expected_token
@@ -70,6 +91,11 @@ def check_authentication() -> bool:
                 st.session_state.authenticated_user = user["username"]
                 st.session_state.user_id = user["id"]
                 st.session_state.user_role = user["role"]
+                st.session_state["auth_token"] = expected_token
+                try:
+                    st.query_params["auth"] = expected_token
+                except Exception:
+                    pass
                 return True
     # Fallback to legacy settings-based auth when no users exist
     if not users:
@@ -81,6 +107,11 @@ def check_authentication() -> bool:
             st.session_state.authenticated_user = stored_username
             st.session_state.user_id = 0
             st.session_state.user_role = "admin"
+            st.session_state["auth_token"] = expected_token
+            try:
+                st.query_params["auth"] = expected_token
+            except Exception:
+                pass
             return True
 
     return False

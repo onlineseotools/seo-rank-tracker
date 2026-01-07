@@ -71,9 +71,9 @@ def _consume_oauth_code():
     expected_state = st.session_state.get("pending_oauth_state")
     derived_provider = None
     if isinstance(state, str):
-        if state.startswith("sheets:"):
+        if state.startswith("sheets|") or state.startswith("sheets:"):
             derived_provider = "sheets"
-        elif state.startswith("gsc:"):
+        elif state.startswith("gsc|") or state.startswith("gsc:"):
             derived_provider = "gsc"
     redirect_uri = config.OAUTH_REDIRECT_URI
 
@@ -292,7 +292,8 @@ with tab2:
                     try:
                         redirect_uri = config.OAUTH_REDIRECT_URI
                         if redirect_uri:
-                            state_token = f"sheets:{uuid.uuid4().hex}"
+                            auth_token = st.session_state.get("auth_token") or _get_query_param("auth")
+                            state_token = f"sheets|{auth_token}|{uuid.uuid4().hex}" if auth_token else f"sheets|{uuid.uuid4().hex}"
                             auth_url, state = get_sheets_auth_url(
                                 redirect_uri=redirect_uri,
                                 state=state_token
@@ -407,7 +408,8 @@ with tab3:
                 try:
                     redirect_uri = config.OAUTH_REDIRECT_URI
                     if redirect_uri:
-                        state_token = f"gsc:{uuid.uuid4().hex}"
+                        auth_token = st.session_state.get("auth_token") or _get_query_param("auth")
+                        state_token = f"gsc|{auth_token}|{uuid.uuid4().hex}" if auth_token else f"gsc|{uuid.uuid4().hex}"
                         auth_url, state = get_gsc_auth_url(
                             redirect_uri=redirect_uri,
                             state=state_token
