@@ -391,6 +391,7 @@ def sync_rankings_to_sheet(sheet_id: str, rankings_data: List, project_id: int =
         _apply_header_format(ws, f"A1:{rowcol_to_a1(1, len(headers))}")
 
         normalized_rows = []
+        history_rows = []
         for keyword in sorted(history_map.keys()):
             latest_value = history_map[keyword].get(latest_date, "")
             prev_value = history_map[keyword].get(history_dates[0], "") if history_dates else ""
@@ -407,7 +408,9 @@ def sync_rankings_to_sheet(sheet_id: str, rankings_data: List, project_id: int =
 
             meta = latest_meta.get(keyword, {})
             url = meta.get("url", "")
-            checked = meta.get("checked", "")
+            checked = meta.get("checked") or (
+                latest_date.isoformat() if hasattr(latest_date, "isoformat") else latest_date
+            )
 
             row = [keyword, latest_value]
             for date_value in history_dates:
@@ -419,6 +422,15 @@ def sync_rankings_to_sheet(sheet_id: str, rankings_data: List, project_id: int =
                 checked,
             ])
             normalized_rows.append(row)
+            history_rows.append([
+                checked,
+                keyword,
+                latest_value,
+                prev_value,
+                change,
+                best_rank,
+                url,
+            ])
 
         if normalized_rows:
             ws.update(f"A2:{rowcol_to_a1(len(normalized_rows)+1, len(headers))}", normalized_rows)
@@ -429,11 +441,6 @@ def sync_rankings_to_sheet(sheet_id: str, rankings_data: List, project_id: int =
             "Change", "Best Rank", "URL Ranking"
         ]])
         _apply_header_format(history_ws, "A1:G1")
-
-        history_rows = []
-        for row in normalized_rows:
-            checked = row[6] or datetime.now().strftime("%Y-%m-%d")
-            history_rows.append([checked, row[0], row[1], row[2], row[3], row[4], row[5]])
 
         if history_rows:
             history_ws.append_rows(history_rows, value_input_option="USER_ENTERED")
