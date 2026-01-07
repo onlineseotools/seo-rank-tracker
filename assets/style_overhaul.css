@@ -28,6 +28,13 @@ code, pre {
 
 body {
     color: var(--text-primary);
+    background: var(--bg) !important;
+}
+
+[data-testid="stAppViewContainer"],
+[data-testid="stAppViewContainer"] > .main,
+.stApp {
+    background: var(--bg) !important;
 }
 
 .main [style*="border-radius"] {
