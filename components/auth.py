@@ -172,6 +172,12 @@ def check_authentication() -> bool:
 def login_form():
     """Display login form"""
     load_custom_css()
+    oauth_success = st.session_state.pop("oauth_success", None)
+    oauth_error = st.session_state.pop("oauth_error", None)
+    if oauth_success:
+        st.success(oauth_success)
+    if oauth_error:
+        st.error(oauth_error)
     st.markdown(
         """
         <style>
