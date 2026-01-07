@@ -14,6 +14,8 @@ from database.models import (
 )
 from components.modern_ui import load_custom_css, render_app_footer
 from database.db import init_database, seed_initial_data
+from services.google_sheets import exchange_sheets_auth_code
+from services.search_console import exchange_gsc_auth_code
 import config
 
 
@@ -64,9 +66,56 @@ def _get_auth_token_from_state() -> str | None:
     return token or None
 
 
+def _consume_oauth_callback():
+    """Handle OAuth redirects when the app lands outside Settings."""
+    try:
+        params = st.query_params
+    except Exception:
+        return
+
+    code = params.get("code")
+    state = params.get("state")
+    if isinstance(code, list):
+        code = code[0] if code else None
+    if isinstance(state, list):
+        state = state[0] if state else None
+
+    if not code or not state:
+        return
+
+    provider = None
+    if state.startswith("sheets|") or state.startswith("sheets:"):
+        provider = "sheets"
+    elif state.startswith("gsc|") or state.startswith("gsc:"):
+        provider = "gsc"
+
+    if not provider:
+        return
+
+    redirect_uri = config.OAUTH_REDIRECT_URI
+    try:
+        if provider == "sheets":
+            exchange_sheets_auth_code(code, redirect_uri=redirect_uri)
+            st.session_state["oauth_success"] = "Google Sheets OAuth connected."
+        else:
+            exchange_gsc_auth_code(code, redirect_uri=redirect_uri)
+            st.session_state["oauth_success"] = "Google Search Console OAuth connected."
+    except Exception as exc:
+        st.session_state["oauth_error"] = str(exc)
+    finally:
+        # Remove OAuth params while keeping any others.
+        cleaned = dict(params)
+        for key in ("code", "state", "scope", "authuser", "prompt"):
+            cleaned.pop(key, None)
+        params.clear()
+        for key, value in cleaned.items():
+            params[key] = value
+
+
 def check_authentication() -> bool:
     """Check if user is authenticated"""
     _ensure_db_ready()
+    _consume_oauth_callback()
     users = list_users(include_inactive=False, include_password_hash=True)
     token = _get_auth_query_token() or _get_auth_token_from_state()
 

@@ -112,6 +112,13 @@ handle_user_menu(action)
 
 _consume_oauth_code()
 
+oauth_success = st.session_state.pop("oauth_success", None)
+oauth_error = st.session_state.pop("oauth_error", None)
+if oauth_success:
+    st.success(oauth_success)
+if oauth_error:
+    st.error(oauth_error)
+
 # Tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "SERP APIs",
