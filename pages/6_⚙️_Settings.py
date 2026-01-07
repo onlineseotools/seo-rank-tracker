@@ -454,16 +454,18 @@ with tab3:
             else:
                 st.caption("Set OAUTH_REDIRECT_URI to enable cloud OAuth.")
 
-            col3, col4 = st.columns([3, 1], vertical_alignment="bottom")
+        col3, col4 = st.columns([3, 1], vertical_alignment="bottom")
 
         with col3:
             st.write("Test your GSC OAuth connection")
 
         with col4:
-                if st.button("Test Connection", key="test_gsc", type="secondary", use_container_width=True):
-                    with st.spinner("Testing..."):
-                        result = test_gsc_connection()
+            result = None
+            if st.button("Test Connection", key="test_gsc", type="secondary", use_container_width=True):
+                with st.spinner("Testing..."):
+                    result = test_gsc_connection()
 
+            if result:
                 if result['success']:
                     st.success(result['message'])
                 else:
