@@ -12,11 +12,11 @@ import config
 
 
 SCOPES = ['https://www.googleapis.com/auth/webmasters.readonly']
-TOKEN_PATH = 'credentials/gsc_token.pickle'
+TOKEN_PATH = config.GSC_TOKEN_PATH
 
 
 def _save_gsc_credentials(creds):
-    os.makedirs('credentials', exist_ok=True)
+    TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(TOKEN_PATH, 'wb') as token:
         pickle.dump(creds, token)
 
@@ -65,7 +65,7 @@ def get_gsc_credentials():
     creds = None
 
     # Load existing token
-    if os.path.exists(TOKEN_PATH):
+    if TOKEN_PATH.exists():
         with open(TOKEN_PATH, 'rb') as token:
             creds = pickle.load(token)
 
@@ -76,6 +76,7 @@ def get_gsc_credentials():
             try:
                 creds.refresh(Request())
                 # Save refreshed credentials
+                TOKEN_PATH.parent.mkdir(parents=True, exist_ok=True)
                 with open(TOKEN_PATH, 'wb') as token:
                     pickle.dump(creds, token)
             except:

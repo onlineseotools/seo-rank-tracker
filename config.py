@@ -9,9 +9,16 @@ BASE_DIR = Path(__file__).parent
 DATABASE_PATH = BASE_DIR / "data" / "seo_tracker.db"
 
 # Google credentials
-GOOGLE_CREDENTIALS_PATH = BASE_DIR / "credentials" / "google_service_account.json"
-GOOGLE_OAUTH_CLIENT_PATH = BASE_DIR / "credentials" / "google_oauth_client.json"
-GOOGLE_OAUTH_TOKEN_PATH = BASE_DIR / "credentials" / "google_oauth_token.json"
+RUNTIME_DIR = Path(
+    os.getenv(
+        "SEO_TRACKER_RUNTIME_DIR",
+        Path.home() / ".streamlit" / "seo-rank-tracker"
+    )
+)
+GOOGLE_CREDENTIALS_PATH = RUNTIME_DIR / "google_service_account.json"
+GOOGLE_OAUTH_CLIENT_PATH = RUNTIME_DIR / "google_oauth_client.json"
+GOOGLE_OAUTH_TOKEN_PATH = RUNTIME_DIR / "google_oauth_token.json"
+GSC_TOKEN_PATH = RUNTIME_DIR / "gsc_token.pickle"
 OAUTH_REDIRECT_URI = os.getenv("OAUTH_REDIRECT_URI")
 
 # Default app password (should be changed in settings)
