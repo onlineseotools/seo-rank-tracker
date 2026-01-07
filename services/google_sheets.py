@@ -15,10 +15,7 @@ from pathlib import Path
 import shutil
 
 
-SCOPES = [
-    'https://www.googleapis.com/auth/spreadsheets',
-    'https://www.googleapis.com/auth/drive'
-]
+SCOPES = config.GOOGLE_OAUTH_SCOPES
 
 REQUIRED_SERVICE_ACCOUNT_FIELDS = {
     "type",

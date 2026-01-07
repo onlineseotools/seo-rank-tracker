@@ -21,6 +21,15 @@ GOOGLE_OAUTH_TOKEN_PATH = RUNTIME_DIR / "google_oauth_token.json"
 GSC_TOKEN_PATH = RUNTIME_DIR / "gsc_token.pickle"
 OAUTH_REDIRECT_URI = os.getenv("OAUTH_REDIRECT_URI")
 
+# OAuth scopes (union of Sheets + Drive + Search Console)
+GOOGLE_OAUTH_SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/drive.metadata",
+    "https://www.googleapis.com/auth/webmasters.readonly",
+]
+
 # Legacy credential locations (pre-cloud)
 LEGACY_CREDENTIALS_DIR = BASE_DIR / "credentials"
 LEGACY_GOOGLE_CREDENTIALS_PATH = LEGACY_CREDENTIALS_DIR / "google_service_account.json"

@@ -12,7 +12,7 @@ import os
 import config
 
 
-SCOPES = ['https://www.googleapis.com/auth/webmasters.readonly']
+SCOPES = config.GOOGLE_OAUTH_SCOPES
 TOKEN_PATH = config.GSC_TOKEN_PATH
 
 
