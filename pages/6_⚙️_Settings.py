@@ -114,10 +114,13 @@ _consume_oauth_code()
 
 oauth_success = st.session_state.pop("oauth_success", None)
 oauth_error = st.session_state.pop("oauth_error", None)
+oauth_debug = st.session_state.pop("oauth_debug", None)
 if oauth_success:
     st.success(oauth_success)
 if oauth_error:
     st.error(oauth_error)
+if oauth_debug:
+    st.info(f"OAuth debug: {oauth_debug}")
 
 # Tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -329,6 +332,16 @@ with tab2:
                 st.success("OAuth token is active. Sheets will be created in your Drive.")
             elif config.GOOGLE_OAUTH_TOKEN_PATH.exists():
                 st.error("OAuth token is invalid or expired. Click Connect with Google again.")
+            with st.expander("OAuth Diagnostics", expanded=False):
+                st.write(f"Redirect URI: {config.OAUTH_REDIRECT_URI or 'not set'}")
+                st.write(f"Client secrets file: {'found' if config.GOOGLE_OAUTH_CLIENT_PATH.exists() else 'missing'}")
+                st.write(f"Sheets token file: {'found' if config.GOOGLE_OAUTH_TOKEN_PATH.exists() else 'missing'}")
+                if st.button("Clear Sheets OAuth Token", key="clear_sheets_oauth"):
+                    try:
+                        config.GOOGLE_OAUTH_TOKEN_PATH.unlink(missing_ok=True)
+                        st.success("Sheets OAuth token cleared.")
+                    except Exception as exc:
+                        st.error(str(exc))
 
         with st.expander("Service Account (Optional)"):
             col1, col2 = st.columns([3, 1], vertical_alignment="bottom")
@@ -441,20 +454,31 @@ with tab3:
             else:
                 st.caption("Set OAUTH_REDIRECT_URI to enable cloud OAuth.")
 
-        col3, col4 = st.columns([3, 1], vertical_alignment="bottom")
+            col3, col4 = st.columns([3, 1], vertical_alignment="bottom")
 
         with col3:
             st.write("Test your GSC OAuth connection")
 
         with col4:
-            if st.button("Test Connection", key="test_gsc", type="secondary", use_container_width=True):
-                with st.spinner("Testing..."):
-                    result = test_gsc_connection()
+                if st.button("Test Connection", key="test_gsc", type="secondary", use_container_width=True):
+                    with st.spinner("Testing..."):
+                        result = test_gsc_connection()
 
                 if result['success']:
                     st.success(result['message'])
                 else:
                     st.warning(result['message'])
+
+        with st.expander("OAuth Diagnostics", expanded=False):
+            st.write(f"Redirect URI: {config.OAUTH_REDIRECT_URI or 'not set'}")
+            st.write(f"Client secrets file: {'found' if config.GOOGLE_OAUTH_CLIENT_PATH.exists() else 'missing'}")
+            st.write(f"GSC token file: {'found' if config.GSC_TOKEN_PATH.exists() else 'missing'}")
+            if st.button("Clear GSC OAuth Token", key="clear_gsc_oauth"):
+                try:
+                    config.GSC_TOKEN_PATH.unlink(missing_ok=True)
+                    st.success("GSC OAuth token cleared.")
+                except Exception as exc:
+                    st.error(str(exc))
 
 # ========== APP SETTINGS TAB ==========
 with tab4:

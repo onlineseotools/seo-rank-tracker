@@ -97,11 +97,24 @@ def _consume_oauth_callback():
         if provider == "sheets":
             exchange_sheets_auth_code(code, redirect_uri=redirect_uri)
             st.session_state["oauth_success"] = "Google Sheets OAuth connected."
+            token_path = config.GOOGLE_OAUTH_TOKEN_PATH
         else:
             exchange_gsc_auth_code(code, redirect_uri=redirect_uri)
             st.session_state["oauth_success"] = "Google Search Console OAuth connected."
+            token_path = config.GSC_TOKEN_PATH
+        st.session_state["oauth_debug"] = {
+            "provider": provider,
+            "client_exists": config.GOOGLE_OAUTH_CLIENT_PATH.exists(),
+            "token_exists": token_path.exists(),
+        }
     except Exception as exc:
         st.session_state["oauth_error"] = str(exc)
+        st.session_state["oauth_debug"] = {
+            "provider": provider,
+            "client_exists": config.GOOGLE_OAUTH_CLIENT_PATH.exists(),
+            "token_exists": False,
+            "error": str(exc),
+        }
     finally:
         # Remove OAuth params while keeping any others.
         cleaned = dict(params)
