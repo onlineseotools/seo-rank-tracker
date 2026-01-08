@@ -1275,6 +1275,10 @@ div[data-testid="stMultiSelect"] [role="combobox"] * {
     border-radius: 0 !important;
 }
 
+.st-emotion-cache-upp7qo {
+    margin-bottom: 0 !important;
+}
+
 [data-testid="stExpander"] details > summary {
     background: var(--bg-elev-2) !important;
     border: 1px solid var(--border) !important;

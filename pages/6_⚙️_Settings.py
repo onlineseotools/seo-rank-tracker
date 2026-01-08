@@ -5,7 +5,7 @@ import uuid
 from components.auth import require_admin, get_current_user, handle_user_menu, logout
 from components.modern_ui import (
     load_custom_css, render_header_with_subtitle, section_panel,
-    render_info_box, render_sidebar_projects, render_app_footer
+    render_info_box, render_sidebar_projects, render_app_footer, sub_panel
 )
 from database.models import get_setting, set_setting, get_sync_logs, update_user, update_user_password
 from services.serp_api import test_api_connection
@@ -418,58 +418,55 @@ with tab3:
         else:
             st.warning("Upload OAuth client secrets in the Google Sheets tab.")
 
-        col1, col2 = st.columns([3, 1], vertical_alignment="bottom")
+        left_col, right_col = st.columns([2, 1], gap="large")
 
-        with col1:
-            st.write("Connect your Google account for Search Console access.")
+        with left_col:
+            with sub_panel("Connect to Google Search Console for organic search data"):
+                st.write("Connect your Google account for Search Console access.")
 
-        with col2:
-            if st.button("Connect Search Console", key="connect_gsc_oauth", type="primary", use_container_width=True):
-                try:
-                    redirect_uri = config.OAUTH_REDIRECT_URI
-                    if redirect_uri:
-                        auth_token = st.session_state.get("auth_token") or _get_query_param("auth")
-                        state_token = f"gsc|{auth_token}|{uuid.uuid4().hex}" if auth_token else f"gsc|{uuid.uuid4().hex}"
-                        auth_url, state = get_gsc_auth_url(
-                            redirect_uri=redirect_uri,
-                            state=state_token
-                        )
-                        st.session_state["pending_oauth_provider"] = "gsc"
-                        st.session_state["pending_oauth_state"] = state
-                        st.session_state["pending_oauth_url"] = auth_url
-                        st.info("Open the authorization link to finish OAuth.")
+                if st.button("Connect Search Console", key="connect_gsc_oauth", type="primary", use_container_width=True):
+                    try:
+                        redirect_uri = config.OAUTH_REDIRECT_URI
+                        if redirect_uri:
+                            auth_token = st.session_state.get("auth_token") or _get_query_param("auth")
+                            state_token = f"gsc|{auth_token}|{uuid.uuid4().hex}" if auth_token else f"gsc|{uuid.uuid4().hex}"
+                            auth_url, state = get_gsc_auth_url(
+                                redirect_uri=redirect_uri,
+                                state=state_token
+                            )
+                            st.session_state["pending_oauth_provider"] = "gsc"
+                            st.session_state["pending_oauth_state"] = state
+                            st.session_state["pending_oauth_url"] = auth_url
+                            st.info("Open the authorization link to finish OAuth.")
+                        else:
+                            with st.spinner("Opening browser for authorization..."):
+                                from services.search_console import initiate_gsc_auth
+                                initiate_gsc_auth(str(config.GOOGLE_OAUTH_CLIENT_PATH))
+                            st.success("OAuth connected")
+                    except Exception as exc:
+                        st.error(str(exc))
+
+                pending_url = st.session_state.get("pending_oauth_url")
+                if st.session_state.get("pending_oauth_provider") == "gsc" and pending_url:
+                    st.link_button("Authorize Google", pending_url, use_container_width=True)
+                    if config.OAUTH_REDIRECT_URI:
+                        st.caption(f"Redirect URI: {config.OAUTH_REDIRECT_URI}")
                     else:
-                        with st.spinner("Opening browser for authorization..."):
-                            from services.search_console import initiate_gsc_auth
-                            initiate_gsc_auth(str(config.GOOGLE_OAUTH_CLIENT_PATH))
-                        st.success("OAuth connected")
-                except Exception as exc:
-                    st.error(str(exc))
+                        st.caption("Set OAUTH_REDIRECT_URI to enable cloud OAuth.")
 
-        pending_url = st.session_state.get("pending_oauth_url")
-        if st.session_state.get("pending_oauth_provider") == "gsc" and pending_url:
-            st.link_button("Authorize Google", pending_url, use_container_width=True)
-            if config.OAUTH_REDIRECT_URI:
-                st.caption(f"Redirect URI: {config.OAUTH_REDIRECT_URI}")
-            else:
-                st.caption("Set OAUTH_REDIRECT_URI to enable cloud OAuth.")
+        with right_col:
+            with sub_panel("Test your GSC OAuth connection"):
+                result = st.session_state.get("gsc_test_result")
+                if st.button("Test Connection", key="test_gsc", type="secondary", use_container_width=True):
+                    with st.spinner("Testing..."):
+                        result = test_gsc_connection()
+                        st.session_state["gsc_test_result"] = result
 
-        col3, col4 = st.columns([3, 1], vertical_alignment="bottom")
-
-        with col3:
-            st.write("Test your GSC OAuth connection")
-
-        with col4:
-            result = None
-            if st.button("Test Connection", key="test_gsc", type="secondary", use_container_width=True):
-                with st.spinner("Testing..."):
-                    result = test_gsc_connection()
-
-            if result:
-                if result['success']:
-                    st.success(result['message'])
-                else:
-                    st.warning(result['message'])
+                if result:
+                    if result['success']:
+                        st.success(result['message'])
+                    else:
+                        st.warning(result['message'])
 
         with st.expander("OAuth Diagnostics", expanded=False):
             st.write(f"Redirect URI: {config.OAUTH_REDIRECT_URI or 'not set'}")
