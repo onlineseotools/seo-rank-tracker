@@ -36,6 +36,7 @@ export default async function SettingsPage({
   const params = await searchParams;
   const activeTab = getSingle(params.tab) ?? "serp-apis";
   const logType = getSingle(params.log_type) ?? "All";
+  const savedSection = getSingle(params.saved) ?? "";
 
   const serperKey = getUserSetting(user.id, "serper_api_key", false) ?? "";
   const dataForSeoUser = getUserSetting(user.id, "dataforseo_username", false) ?? "";
@@ -77,6 +78,21 @@ export default async function SettingsPage({
           <div className="info-box-content">{googleError}</div>
         </div>
       ) : null}
+      {activeTab === "serp-apis" && savedSection ? (
+        <div className="info-box info-box--success">
+          <div className="info-box-content">
+            {savedSection === "serper"
+              ? "Serper settings saved."
+              : savedSection === "dataforseo"
+                ? "DataForSEO settings saved."
+                : savedSection === "scrapingrobot"
+                  ? "ScrapingRobot settings saved."
+                  : savedSection === "default-api"
+                    ? "Default SERP API saved."
+                    : "Settings saved."}
+          </div>
+        </div>
+      ) : null}
 
       <div className="tab-links">
         {tabs.map((tab) => (
@@ -86,10 +102,16 @@ export default async function SettingsPage({
 
       {activeTab === "serp-apis" ? (
         <Panel title="SERP API Configuration" description="Configure your rank tracking API providers">
-          <form action={saveSettingsAction} className="grid gap-4 xl:grid-cols-2">
+          <div className="grid gap-4 xl:grid-cols-2">
             <div className="sub-panel settings-provider settings-card flex flex-col gap-4">
               <div className="card-title">Serper.dev</div>
-              <div className="grid gap-4 lg:grid-cols-[minmax(280px,520px)_auto] lg:items-end">
+              <form action={saveSettingsAction} className="grid gap-4 lg:grid-cols-[minmax(280px,520px)_auto] lg:items-end">
+                <input type="hidden" name="tab" value="serp-apis" />
+                <input type="hidden" name="section" value="serper" />
+                <input type="hidden" name="dataforseo_username" value={dataForSeoUser} />
+                <input type="hidden" name="dataforseo_password" value={dataForSeoPass} />
+                <input type="hidden" name="scrapingrobot_api_key" value={scrapingRobotKey} />
+                <input type="hidden" name="default_serp_api" value={defaultApi} />
                 <label className="grid gap-2">
                   <span className="eyebrow">API Key</span>
                   <input name="serper_api_key" defaultValue={serperKey} type="password" />
@@ -99,12 +121,17 @@ export default async function SettingsPage({
                     Save
                   </button>
                 </div>
-              </div>
+              </form>
             </div>
 
             <div className="sub-panel settings-provider settings-card flex flex-col gap-4">
               <div className="card-title">DataForSEO</div>
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end">
+              <form action={saveSettingsAction} className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end">
+                <input type="hidden" name="tab" value="serp-apis" />
+                <input type="hidden" name="section" value="dataforseo" />
+                <input type="hidden" name="serper_api_key" value={serperKey} />
+                <input type="hidden" name="scrapingrobot_api_key" value={scrapingRobotKey} />
+                <input type="hidden" name="default_serp_api" value={defaultApi} />
                 <label className="grid gap-2">
                   <span className="eyebrow">Username</span>
                   <input name="dataforseo_username" defaultValue={dataForSeoUser} />
@@ -118,12 +145,18 @@ export default async function SettingsPage({
                     Save
                   </button>
                 </div>
-              </div>
+              </form>
             </div>
 
             <div className="sub-panel settings-provider settings-card flex flex-col gap-4">
               <div className="card-title">ScrapingRobot</div>
-              <div className="grid gap-4 lg:grid-cols-[minmax(280px,520px)_auto] lg:items-end">
+              <form action={saveSettingsAction} className="grid gap-4 lg:grid-cols-[minmax(280px,520px)_auto] lg:items-end">
+                <input type="hidden" name="tab" value="serp-apis" />
+                <input type="hidden" name="section" value="scrapingrobot" />
+                <input type="hidden" name="serper_api_key" value={serperKey} />
+                <input type="hidden" name="dataforseo_username" value={dataForSeoUser} />
+                <input type="hidden" name="dataforseo_password" value={dataForSeoPass} />
+                <input type="hidden" name="default_serp_api" value={defaultApi} />
                 <label className="grid gap-2">
                   <span className="eyebrow">API Key</span>
                   <input name="scrapingrobot_api_key" defaultValue={scrapingRobotKey} type="password" />
@@ -133,28 +166,34 @@ export default async function SettingsPage({
                     Save
                   </button>
                 </div>
-              </div>
+              </form>
             </div>
 
             <div className="sub-panel settings-card flex flex-col gap-4">
               <div className="card-title">Default API</div>
-              <div className="grid gap-4 lg:grid-cols-[minmax(280px,420px)_auto] lg:items-end">
+              <form action={saveSettingsAction} className="grid gap-4 lg:grid-cols-[minmax(280px,420px)_auto] lg:items-end">
+                <input type="hidden" name="tab" value="serp-apis" />
+                <input type="hidden" name="section" value="default-api" />
+                <input type="hidden" name="serper_api_key" value={serperKey} />
+                <input type="hidden" name="dataforseo_username" value={dataForSeoUser} />
+                <input type="hidden" name="dataforseo_password" value={dataForSeoPass} />
+                <input type="hidden" name="scrapingrobot_api_key" value={scrapingRobotKey} />
                 <label className="grid gap-2">
                   <span className="eyebrow">Select default SERP API</span>
                   <select name="default_serp_api" defaultValue={defaultApi}>
                     <option value="serper">Serper.dev</option>
                     <option value="dataforseo">DataForSEO</option>
                       <option value="scrapingrobot">ScrapingRobot</option>
-                    </select>
-                  </label>
+                  </select>
+                </label>
                 <div className="flex items-end">
                   <button type="submit" className="dashboard-action settings-save-button">
                     Save
                   </button>
                 </div>
-              </div>
+              </form>
             </div>
-          </form>
+          </div>
         </Panel>
       ) : null}
 

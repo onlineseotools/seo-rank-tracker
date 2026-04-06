@@ -247,6 +247,8 @@ export async function deleteUserAction(formData: FormData) {
 
 export async function saveSettingsAction(formData: FormData) {
   const user = await requireSessionUser();
+  const tab = String(formData.get("tab") ?? "serp-apis");
+  const section = String(formData.get("section") ?? "serp");
   const keys = [
     "serper_api_key",
     "dataforseo_username",
@@ -264,6 +266,7 @@ export async function saveSettingsAction(formData: FormData) {
   }
   revalidatePath("/settings");
   revalidatePath("/rank-checker");
+  redirect(`/settings?tab=${encodeURIComponent(tab)}&saved=${encodeURIComponent(section)}`);
 }
 
 export async function clearSyncLogsAction() {
