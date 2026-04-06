@@ -8,7 +8,16 @@ import path from "node:path";
 
 const APP_DIR = process.cwd();
 const DATA_DIR = path.join(APP_DIR, "data");
-const DB_PATH = process.env.SEO_TOOL_DB_PATH ?? path.join(DATA_DIR, "seo_tool_new.db");
+const BUNDLED_DB_PATH = path.join(DATA_DIR, "seo_tool_new.db");
+const TEMP_DB_DIR = path.join(os.tmpdir(), "seo-rank-tracker");
+const TEMP_DB_PATH = path.join(TEMP_DB_DIR, "seo_tool_new.db");
+const IS_VERCEL = Boolean(process.env.VERCEL);
+const RAW_DB_PATH = process.env.SEO_TOOL_DB_PATH;
+const RESOLVED_ENV_DB_PATH = RAW_DB_PATH
+  ? path.isAbsolute(RAW_DB_PATH)
+    ? RAW_DB_PATH
+    : path.resolve(APP_DIR, RAW_DB_PATH)
+  : null;
 const ORIGINAL_RUNTIME_DB =
   process.env.NODE_ENV === "development"
     ? path.join(/* turbopackIgnore: true */ os.homedir(), ".streamlit", "seo-rank-tracker", "seo_tracker.db")
@@ -17,6 +26,19 @@ const LEGACY_LOCAL_DB =
   process.env.NODE_ENV === "development"
     ? path.resolve(/* turbopackIgnore: true */ APP_DIR, "..", "data", "seo_tracker.db")
     : "";
+
+function shouldUseTempRuntimeDb(candidatePath: string | null) {
+  if (!IS_VERCEL || !candidatePath) return false;
+  const normalizedAppDir = path.resolve(APP_DIR);
+  const normalizedTempDir = path.resolve(TEMP_DB_DIR);
+  const normalizedCandidate = path.resolve(candidatePath);
+  return normalizedCandidate.startsWith(normalizedAppDir) && !normalizedCandidate.startsWith(normalizedTempDir);
+}
+
+const DB_PATH =
+  shouldUseTempRuntimeDb(RESOLVED_ENV_DB_PATH) || (!RESOLVED_ENV_DB_PATH && IS_VERCEL)
+    ? TEMP_DB_PATH
+    : RESOLVED_ENV_DB_PATH ?? BUNDLED_DB_PATH;
 
 let db: Database.Database | null = null;
 
@@ -59,7 +81,7 @@ const INITIAL_PROJECTS = [
 ];
 
 function ensureDataDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 }
 
 function bootstrapDatabaseFile() {
@@ -69,9 +91,9 @@ function bootstrapDatabaseFile() {
     return;
   }
 
-  const candidates = [ORIGINAL_RUNTIME_DB, LEGACY_LOCAL_DB];
+  const candidates = [BUNDLED_DB_PATH, ORIGINAL_RUNTIME_DB, LEGACY_LOCAL_DB];
   for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) {
+    if (candidate !== DB_PATH && fs.existsSync(candidate)) {
       fs.copyFileSync(candidate, DB_PATH);
       return;
     }
