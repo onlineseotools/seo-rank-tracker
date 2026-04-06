@@ -70,6 +70,14 @@ function withStatusParams(target: string, params: Record<string, string>) {
   return query ? `${pathname}?${query}` : pathname;
 }
 
+function getRankCheckWorkerCount(apiType: string, keywordCount: number) {
+  if (keywordCount <= 1) return 1;
+  if (apiType === "serper") return Math.min(1, keywordCount);
+  if (apiType === "scrapingrobot") return Math.min(2, keywordCount);
+  if (apiType === "dataforseo") return Math.min(3, keywordCount);
+  return Math.min(2, keywordCount);
+}
+
 function redirectWithStatus(
   rawTarget: string | FormDataEntryValue | null,
   fallback: string,
@@ -813,7 +821,7 @@ export async function runRankCheckAction(formData: FormData) {
   let success = 0;
   let errors = 0;
 
-  const workerCount = Math.min(4, queue.length);
+  const workerCount = getRankCheckWorkerCount(apiType, queue.length);
   const workers = Array.from({ length: workerCount }, async () => {
     while (queue.length) {
       const keyword = queue.shift();

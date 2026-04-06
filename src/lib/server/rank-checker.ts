@@ -38,8 +38,41 @@ function extractDomain(input: string) {
   }
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithRateLimitRetry(
+  input: string,
+  init: RequestInit,
+  options: {
+    retries?: number;
+    baseDelayMs?: number;
+  } = {},
+) {
+  const retries = options.retries ?? 3;
+  const baseDelayMs = options.baseDelayMs ?? 1200;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const response = await fetch(input, init);
+    if (response.status !== 429 && response.status < 500) {
+      return response;
+    }
+
+    if (attempt === retries) {
+      return response;
+    }
+
+    const retryAfter = Number(response.headers.get("retry-after") ?? "");
+    const delay = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : baseDelayMs * 2 ** attempt;
+    await sleep(delay);
+  }
+
+  return fetch(input, init);
+}
+
 export async function checkRankSerper(keyword: string, location: string, targetDomain: string, apiKey: string) {
-  const response = await fetch("https://google.serper.dev/search", {
+  const response = await fetchWithRateLimitRetry("https://google.serper.dev/search", {
     method: "POST",
     headers: {
       "X-API-KEY": apiKey,
@@ -73,7 +106,7 @@ export async function checkRankDataForSeo(
   password: string,
 ) {
   const token = Buffer.from(`${username}:${password}`).toString("base64");
-  const response = await fetch("https://api.dataforseo.com/v3/serp/google/organic/live/advanced", {
+  const response = await fetchWithRateLimitRetry("https://api.dataforseo.com/v3/serp/google/organic/live/advanced", {
     method: "POST",
     headers: {
       Authorization: `Basic ${token}`,
@@ -111,9 +144,12 @@ export async function checkRankDataForSeo(
 export async function checkRankScrapingRobot(keyword: string, location: string, targetDomain: string, apiKey: string) {
   const gl = LOCATION_CODES[location] ?? "us";
   const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(keyword)}&num=100&gl=${gl}`;
-  const response = await fetch(`https://api.scrapingrobot.com/?token=${encodeURIComponent(apiKey)}&url=${encodeURIComponent(googleUrl)}&render=false`, {
-    cache: "no-store",
-  });
+  const response = await fetchWithRateLimitRetry(
+    `https://api.scrapingrobot.com/?token=${encodeURIComponent(apiKey)}&url=${encodeURIComponent(googleUrl)}&render=false`,
+    {
+      cache: "no-store",
+    },
+  );
 
   if (!response.ok) {
     return { position: null, url: null, error: `API error: ${response.status}` };
@@ -142,4 +178,3 @@ export async function checkRankScrapingRobot(keyword: string, location: string, 
   }
   return { position: null, url: null, error: null };
 }
-
