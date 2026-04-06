@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Panel, PageIntro, StatTile } from "@/components/ui";
 import { getGoogleConnectionState } from "@/lib/server/google";
-import { getAllProjects, getProjectStats, getUserSetting } from "@/lib/server/repo";
+import { getAllProjects, getProjectStats } from "@/lib/server/repo";
+import { getSerpSetting } from "@/lib/server/serp-settings";
 import { requireSessionUser } from "@/lib/server/session";
 
 const featureCards = [
@@ -63,9 +64,9 @@ export default async function ToolDetailsPage() {
   );
 
   let apisConfigured = 0;
-  if (getUserSetting(user.id, "serper_api_key", false)) apisConfigured += 1;
-  if (getUserSetting(user.id, "dataforseo_username", false) && getUserSetting(user.id, "dataforseo_password", false)) apisConfigured += 1;
-  if (getUserSetting(user.id, "scrapingrobot_api_key", false)) apisConfigured += 1;
+  if (await getSerpSetting(user.id, "serper_api_key")) apisConfigured += 1;
+  if ((await getSerpSetting(user.id, "dataforseo_username")) && (await getSerpSetting(user.id, "dataforseo_password"))) apisConfigured += 1;
+  if (await getSerpSetting(user.id, "scrapingrobot_api_key")) apisConfigured += 1;
 
   const googleState = getGoogleConnectionState(user.id);
 

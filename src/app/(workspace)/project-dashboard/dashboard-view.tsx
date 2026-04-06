@@ -34,8 +34,8 @@ import {
   getResolvedCannibalization,
   getSyncLogs,
   getTopMovers,
-  getUserSetting,
 } from "@/lib/server/repo";
+import { getSerpSetting } from "@/lib/server/serp-settings";
 import { requireSessionUser } from "@/lib/server/session";
 import { getBaseUrl } from "@/lib/server/url";
 import Link from "next/link";
@@ -344,7 +344,7 @@ export default async function ProjectDashboardView({
   const resolvedRows = isCannibalizationTab ? getResolvedCannibalization(project.id) : [];
   const resolvedMap = new Map(resolvedRows.map((item) => [item.keyword.toLowerCase(), item]));
   const activityLogs = isRankTab ? getSyncLogs(project.id, 15) : [];
-  const defaultSerpApi = isRankTab ? getUserSetting(user.id, "default_serp_api", false) ?? "serper" : "serper";
+  const defaultSerpApi = isRankTab ? (await getSerpSetting(user.id, "default_serp_api")) ?? "serper" : "serper";
 
   const rankingDistribution = isOverviewTab ? buildDistribution(rankingsLatest) : [];
   const rankingTrend = isOverviewTab ? buildTrend(rankingsHistory) : [];
@@ -399,9 +399,9 @@ export default async function ProjectDashboardView({
 
   const providerStatuses = isRankTab
     ? {
-        serper: Boolean(getUserSetting(user.id, "serper_api_key", false)),
-        dataforseo: Boolean(getUserSetting(user.id, "dataforseo_username", false) && getUserSetting(user.id, "dataforseo_password", false)),
-        scrapingrobot: Boolean(getUserSetting(user.id, "scrapingrobot_api_key", false)),
+        serper: Boolean(await getSerpSetting(user.id, "serper_api_key")),
+        dataforseo: Boolean((await getSerpSetting(user.id, "dataforseo_username")) && (await getSerpSetting(user.id, "dataforseo_password"))),
+        scrapingrobot: Boolean(await getSerpSetting(user.id, "scrapingrobot_api_key")),
       }
     : { serper: false, dataforseo: false, scrapingrobot: false };
 

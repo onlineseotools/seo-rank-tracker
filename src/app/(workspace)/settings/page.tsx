@@ -9,7 +9,8 @@ import {
   updateProfileAction,
 } from "@/lib/server/actions";
 import { getGoogleConnectionState, listGscProperties } from "@/lib/server/google";
-import { getSyncLogs, getUserSetting } from "@/lib/server/repo";
+import { getSyncLogs } from "@/lib/server/repo";
+import { getSerpSetting } from "@/lib/server/serp-settings";
 import { requireSessionUser } from "@/lib/server/session";
 import { getBaseUrl } from "@/lib/server/url";
 
@@ -38,11 +39,11 @@ export default async function SettingsPage({
   const logType = getSingle(params.log_type) ?? "All";
   const savedSection = getSingle(params.saved) ?? "";
 
-  const serperKey = getUserSetting(user.id, "serper_api_key", false) ?? "";
-  const dataForSeoUser = getUserSetting(user.id, "dataforseo_username", false) ?? "";
-  const dataForSeoPass = getUserSetting(user.id, "dataforseo_password", false) ?? "";
-  const scrapingRobotKey = getUserSetting(user.id, "scrapingrobot_api_key", false) ?? "";
-  const defaultApi = getUserSetting(user.id, "default_serp_api", false) ?? "serper";
+  const serperKey = (await getSerpSetting(user.id, "serper_api_key")) ?? "";
+  const dataForSeoUser = (await getSerpSetting(user.id, "dataforseo_username")) ?? "";
+  const dataForSeoPass = (await getSerpSetting(user.id, "dataforseo_password")) ?? "";
+  const scrapingRobotKey = (await getSerpSetting(user.id, "scrapingrobot_api_key")) ?? "";
+  const defaultApi = (await getSerpSetting(user.id, "default_serp_api")) ?? "serper";
   const googleState = getGoogleConnectionState(user.id);
   const googleSuccess =
     typeof params.google_sheets === "string" || typeof params.google_gsc === "string"

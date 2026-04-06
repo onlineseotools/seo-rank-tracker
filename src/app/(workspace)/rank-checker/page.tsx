@@ -2,7 +2,8 @@ import { ProjectPicker } from "@/components/project-picker";
 import { Panel, PageIntro, Pill } from "@/components/ui";
 import { runRankCheckAction } from "@/lib/server/actions";
 import { resolveProjectContext } from "@/lib/server/project-context";
-import { getLatestRankCheckFailures, getProjectStats, getRankingsByProject, getUserSetting } from "@/lib/server/repo";
+import { getLatestRankCheckFailures, getProjectStats, getRankingsByProject } from "@/lib/server/repo";
+import { getSerpSetting } from "@/lib/server/serp-settings";
 import { requireSessionUser } from "@/lib/server/session";
 
 export default async function RankCheckerPage({
@@ -15,18 +16,18 @@ export default async function RankCheckerPage({
   const stats = project ? getProjectStats(project.id) : null;
   const failures = project ? getLatestRankCheckFailures(project.id) : [];
   const latest = project ? getRankingsByProject(project.id, true) : [];
-  const defaultApi = getUserSetting(user.id, "default_serp_api", false) ?? "serper";
+  const defaultApi = (await getSerpSetting(user.id, "default_serp_api")) ?? "serper";
   const providers = [
-    { key: "serper", label: "Serper.dev", status: getUserSetting(user.id, "serper_api_key", false) ? "Connected" : "Missing" },
+    { key: "serper", label: "Serper.dev", status: (await getSerpSetting(user.id, "serper_api_key")) ? "Connected" : "Missing" },
     {
       key: "dataforseo",
       label: "DataForSEO",
       status:
-        getUserSetting(user.id, "dataforseo_username", false) && getUserSetting(user.id, "dataforseo_password", false)
+        (await getSerpSetting(user.id, "dataforseo_username")) && (await getSerpSetting(user.id, "dataforseo_password"))
           ? "Connected"
           : "Missing",
     },
-    { key: "scrapingrobot", label: "ScrapingRobot", status: getUserSetting(user.id, "scrapingrobot_api_key", false) ? "Connected" : "Missing" },
+    { key: "scrapingrobot", label: "ScrapingRobot", status: (await getSerpSetting(user.id, "scrapingrobot_api_key")) ? "Connected" : "Missing" },
   ];
 
   return (

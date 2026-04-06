@@ -24,7 +24,6 @@ import {
   getLatestRanking,
   getProjectById,
   getRankingsByProject,
-  getUserSetting,
   markCannibalizationResolved,
   setProjectSheetLinks,
   setUserProjectAccess,
@@ -51,6 +50,7 @@ import {
 } from "@/lib/server/google";
 import { detectCannibalization } from "@/lib/server/analytics";
 import { clearSession, createSession, requireSessionUser } from "@/lib/server/session";
+import { getSerpSetting, SERP_SETTING_KEYS, setSerpSettingCookie } from "@/lib/server/serp-settings";
 import { getBaseUrl } from "@/lib/server/url";
 import { checkRankDataForSeo, checkRankScrapingRobot, checkRankSerper } from "@/lib/server/rank-checker";
 
@@ -249,23 +249,19 @@ export async function saveSettingsAction(formData: FormData) {
   const user = await requireSessionUser();
   const tab = String(formData.get("tab") ?? "serp-apis");
   const section = String(formData.get("section") ?? "serp");
-  const keys = [
-    "serper_api_key",
-    "dataforseo_username",
-    "dataforseo_password",
-    "scrapingrobot_api_key",
-    "default_serp_api",
-  ];
-  for (const key of keys) {
+  for (const key of SERP_SETTING_KEYS) {
     const value = String(formData.get(key) ?? "");
     if (value) {
       setUserSetting(user.id, key, value);
     } else {
       deleteUserSetting(user.id, key);
     }
+    await setSerpSettingCookie(key, value);
   }
   revalidatePath("/settings");
   revalidatePath("/rank-checker");
+  revalidatePath("/tool-details");
+  revalidatePath("/project-dashboard");
   redirect(`/settings?tab=${encodeURIComponent(tab)}&saved=${encodeURIComponent(section)}`);
 }
 
@@ -533,10 +529,10 @@ export async function runRankCheckAction(formData: FormData) {
   clearRankCheckFailures(projectId);
 
   const creds = {
-    serper_api_key: getUserSetting(user.id, "serper_api_key", false) ?? "",
-    dataforseo_username: getUserSetting(user.id, "dataforseo_username", false) ?? "",
-    dataforseo_password: getUserSetting(user.id, "dataforseo_password", false) ?? "",
-    scrapingrobot_api_key: getUserSetting(user.id, "scrapingrobot_api_key", false) ?? "",
+    serper_api_key: (await getSerpSetting(user.id, "serper_api_key")) ?? "",
+    dataforseo_username: (await getSerpSetting(user.id, "dataforseo_username")) ?? "",
+    dataforseo_password: (await getSerpSetting(user.id, "dataforseo_password")) ?? "",
+    scrapingrobot_api_key: (await getSerpSetting(user.id, "scrapingrobot_api_key")) ?? "",
   };
 
   let success = 0;
