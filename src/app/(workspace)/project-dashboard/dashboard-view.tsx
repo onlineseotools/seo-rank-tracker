@@ -307,6 +307,8 @@ export default async function ProjectDashboardView({
   const activeCannibalizationTab = resolveTab(params.cannibal_view, CANNIBALIZATION_TABS, "gsc");
   const activeTrackedTab = resolveTab(params.tracked_view, TRACKED_TABS, "active");
   const activeKeywordMode = resolveTab(params.keyword_mode, KEYWORD_MODES, "single");
+  const rankStatus = params.rank_status;
+  const rankMessage = params.rank_message;
 
   if (!project) {
     return (
@@ -947,6 +949,11 @@ export default async function ProjectDashboardView({
 
       {activeTab === "rank" ? (
         <>
+          {rankMessage ? (
+            <InfoBox tone={rankStatus === "error" ? "error" : rankStatus === "warning" ? "warning" : "success"}>
+              {rankMessage}
+            </InfoBox>
+          ) : null}
           <Panel title="Project Snapshot" description="Current keyword counts and last check status">
             <div className="surface-grid-3">
               <StatTile label="Total Keywords" value={String(keywordCount)} detail="Active keywords" />
@@ -960,6 +967,7 @@ export default async function ProjectDashboardView({
               <div className="workspace-form">
                 <form action={runRankCheckAction} className="workspace-form">
                   <input type="hidden" name="project_id" value={project.id} />
+                  <input type="hidden" name="return_to" value={buildHref(params, { tab: "rank" })} />
                   <label className="workspace-form__field">
                     <span className="eyebrow">API Provider</span>
                     <select name="api_type" defaultValue={defaultSerpApi}>
@@ -1001,6 +1009,7 @@ export default async function ProjectDashboardView({
               <form action={runRankCheckAction} className="dashboard-failures-form">
                 <input type="hidden" name="project_id" value={project.id} />
                 <input type="hidden" name="api_type" value={defaultSerpApi} />
+                <input type="hidden" name="return_to" value={buildHref(params, { tab: "rank" })} />
                 <div className="dashboard-checkbox-list">
                   {failures.map((failure) => (
                     <label key={`${failure.keyword}-${failure.created_at}`} className="workspace-toggle">

@@ -54,6 +54,22 @@ import { getSerpSetting, SERP_SETTING_KEYS, setSerpSettingCookie } from "@/lib/s
 import { getBaseUrl } from "@/lib/server/url";
 import { checkRankDataForSeo, checkRankScrapingRobot, checkRankSerper } from "@/lib/server/rank-checker";
 
+function buildSafeRedirectTarget(target: string, fallback: string) {
+  const trimmed = target.trim();
+  if (!trimmed.startsWith("/")) return fallback;
+  return trimmed;
+}
+
+function withStatusParams(target: string, params: Record<string, string>) {
+  const [pathname, search = ""] = target.split("?");
+  const next = new URLSearchParams(search);
+  for (const [key, value] of Object.entries(params)) {
+    next.set(key, value);
+  }
+  const query = next.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
 export async function loginAction(formData: FormData) {
   const login = String(formData.get("login") ?? "").trim();
   const password = String(formData.get("password") ?? "");
@@ -512,10 +528,10 @@ export async function runRankCheckAction(formData: FormData) {
   const user = await requireSessionUser();
   const projectId = Number(formData.get("project_id"));
   const apiType = String(formData.get("api_type") ?? "serper");
+  const returnTo = buildSafeRedirectTarget(String(formData.get("return_to") ?? "/rank-checker"), "/rank-checker");
   const project = getProjectById(projectId);
   if (!project) {
-    revalidatePath("/rank-checker");
-    return;
+    redirect(withStatusParams(returnTo, { rank_status: "error", rank_message: "Project not found." }));
   }
 
   const selectedKeywordIds = [...formData.getAll("keyword_ids").map((value) => String(value ?? "")), String(formData.get("keyword_ids") ?? "")]
@@ -535,79 +551,112 @@ export async function runRankCheckAction(formData: FormData) {
     scrapingrobot_api_key: (await getSerpSetting(user.id, "scrapingrobot_api_key")) ?? "",
   };
 
+  const missingCredentialMessage =
+    apiType === "dataforseo"
+      ? !creds.dataforseo_username || !creds.dataforseo_password
+        ? "Configure DataForSEO username and password in Settings before running checks."
+        : ""
+      : apiType === "scrapingrobot"
+        ? !creds.scrapingrobot_api_key
+          ? "Configure the ScrapingRobot API key in Settings before running checks."
+          : ""
+        : !creds.serper_api_key
+          ? "Configure the Serper.dev API key in Settings before running checks."
+          : "";
+
+  if (missingCredentialMessage) {
+    redirect(withStatusParams(returnTo, { rank_status: "error", rank_message: missingCredentialMessage }));
+  }
+
+  if (keywords.length === 0) {
+    redirect(withStatusParams(returnTo, { rank_status: "warning", rank_message: "No keywords available for this run." }));
+  }
+
+  const checkedAt = new Date().toISOString().slice(0, 10);
+  const queue = [...keywords];
   let success = 0;
   let errors = 0;
 
-  if (keywords.length === 0) {
-    revalidatePath("/rank-checker");
-    revalidatePath("/project-dashboard");
-    return;
-  }
+  const workerCount = Math.min(4, queue.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (queue.length) {
+      const keyword = queue.shift();
+      if (!keyword) return;
+      try {
+        const previous = getLatestRanking(keyword.id);
+        let result: { position: number | null; url: string | null; error: string | null };
+        if (apiType === "dataforseo") {
+          result = await checkRankDataForSeo(
+            keyword.keyword,
+            project.target_location,
+            project.url,
+            creds.dataforseo_username,
+            creds.dataforseo_password,
+          );
+        } else if (apiType === "scrapingrobot") {
+          result = await checkRankScrapingRobot(
+            keyword.keyword,
+            project.target_location,
+            project.url,
+            creds.scrapingrobot_api_key,
+          );
+        } else {
+          result = await checkRankSerper(
+            keyword.keyword,
+            project.target_location,
+            project.url,
+            creds.serper_api_key,
+          );
+        }
 
-  for (const keyword of keywords) {
-    try {
-      const previous = getLatestRanking(keyword.id);
-      let result: { position: number | null; url: string | null; error: string | null };
-      if (apiType === "dataforseo") {
-        result = await checkRankDataForSeo(
-          keyword.keyword,
-          project.target_location,
-          project.url,
-          creds.dataforseo_username,
-          creds.dataforseo_password,
-        );
-      } else if (apiType === "scrapingrobot") {
-        result = await checkRankScrapingRobot(
-          keyword.keyword,
-          project.target_location,
-          project.url,
-          creds.scrapingrobot_api_key,
-        );
-      } else {
-        result = await checkRankSerper(
-          keyword.keyword,
-          project.target_location,
-          project.url,
-          creds.serper_api_key,
-        );
-      }
+        if (result.error) {
+          errors += 1;
+          addRankCheckFailure({
+            project_id: projectId,
+            keyword_id: keyword.id,
+            keyword: keyword.keyword,
+            error_message: result.error,
+            run_id: runId,
+          });
+          continue;
+        }
 
-      if (result.error) {
+        createRanking({
+          keyword_id: keyword.id,
+          position: result.position,
+          previous_position: previous?.position ?? null,
+          url_found: result.url,
+          checked_at: checkedAt,
+          api_used: apiType,
+        });
+        success += 1;
+      } catch (error) {
         errors += 1;
         addRankCheckFailure({
           project_id: projectId,
           keyword_id: keyword.id,
           keyword: keyword.keyword,
-          error_message: result.error,
+          error_message: error instanceof Error ? error.message : "Unknown error",
           run_id: runId,
         });
-        continue;
       }
-
-      createRanking({
-        keyword_id: keyword.id,
-        position: result.position,
-        previous_position: previous?.position ?? null,
-        url_found: result.url,
-        checked_at: new Date().toISOString().slice(0, 10),
-        api_used: apiType,
-      });
-      success += 1;
-    } catch (error) {
-      errors += 1;
-      addRankCheckFailure({
-        project_id: projectId,
-        keyword_id: keyword.id,
-        keyword: keyword.keyword,
-        error_message: error instanceof Error ? error.message : "Unknown error",
-        run_id: runId,
-      });
     }
-  }
+  });
+
+  await Promise.all(workers);
 
   addSyncLog(projectId, "rank_check", errors > 0 ? "warning" : "success", `Checked ${success}/${keywords.length} keywords using ${apiType}`);
   revalidatePath("/rank-checker");
   revalidatePath("/dashboard");
   revalidatePath("/keywords");
   revalidatePath("/project-dashboard");
+  redirect(
+    withStatusParams(returnTo, {
+      rank_status: errors > 0 ? "warning" : "success",
+      rank_message:
+        errors > 0
+          ? `Checked ${success}/${keywords.length} keywords using ${apiType}. ${errors} failed.`
+          : `Checked ${success}/${keywords.length} keywords using ${apiType}.`,
+    }),
+  );
 }

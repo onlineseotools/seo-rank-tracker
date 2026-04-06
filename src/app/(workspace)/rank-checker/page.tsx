@@ -1,5 +1,5 @@
 import { ProjectPicker } from "@/components/project-picker";
-import { Panel, PageIntro, Pill } from "@/components/ui";
+import { InfoBox, Panel, PageIntro, Pill } from "@/components/ui";
 import { runRankCheckAction } from "@/lib/server/actions";
 import { resolveProjectContext } from "@/lib/server/project-context";
 import { getLatestRankCheckFailures, getProjectStats, getRankingsByProject } from "@/lib/server/repo";
@@ -12,7 +12,12 @@ export default async function RankCheckerPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await requireSessionUser();
-  const { projects, project } = await resolveProjectContext(user, searchParams, true);
+  const params = await searchParams;
+  const firstParam = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+  const rankStatus = firstParam(params.rank_status);
+  const rankMessage = firstParam(params.rank_message);
+  const projectParam = firstParam(params.project);
+  const { projects, project } = await resolveProjectContext(user, Promise.resolve(params), true);
   const stats = project ? getProjectStats(project.id) : null;
   const failures = project ? getLatestRankCheckFailures(project.id) : [];
   const latest = project ? getRankingsByProject(project.id, true) : [];
@@ -37,6 +42,12 @@ export default async function RankCheckerPage({
         subtitle="This page reads the active project from the real tracker database and can execute live rank checks using the configured SERP provider credentials."
         badge="Rank checker"
       />
+
+      {rankMessage ? (
+        <InfoBox tone={rankStatus === "error" ? "error" : rankStatus === "warning" ? "warning" : "success"}>
+          {rankMessage}
+        </InfoBox>
+      ) : null}
 
       <Panel kicker="Scope" title="Project selection" description="Select the variant you want to run or review before firing a new SERP check.">
         <ProjectPicker projects={projects} selectedProjectId={project?.id ?? null} />
@@ -64,6 +75,7 @@ export default async function RankCheckerPage({
             {project ? (
               <form action={runRankCheckAction} className="panel-soft rounded-[22px] p-5">
                 <input type="hidden" name="project_id" value={project.id} />
+                <input type="hidden" name="return_to" value={`/rank-checker${projectParam ? `?project=${projectParam}` : project ? `?project=${project.id}` : ""}`} />
                 <div className="eyebrow">Current run</div>
                 <div className="mt-3 text-3xl font-semibold tracking-[-0.04em]">{project.name}</div>
                 <div className="mt-2 text-sm text-[var(--muted)]">
