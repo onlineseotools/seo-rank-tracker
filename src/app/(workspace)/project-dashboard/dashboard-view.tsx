@@ -307,6 +307,8 @@ export default async function ProjectDashboardView({
   const activeCannibalizationTab = resolveTab(params.cannibal_view, CANNIBALIZATION_TABS, "gsc");
   const activeTrackedTab = resolveTab(params.tracked_view, TRACKED_TABS, "active");
   const activeKeywordMode = resolveTab(params.keyword_mode, KEYWORD_MODES, "single");
+  const actionStatus = params.status;
+  const actionMessage = params.message;
   const rankStatus = params.rank_status;
   const rankMessage = params.rank_message;
 
@@ -478,6 +480,12 @@ export default async function ProjectDashboardView({
     <div className="project-workspace">
       <PageIntro title="Project Dashboard" subtitle="All project data and actions in one place" badge="Project Dashboard" />
 
+      {actionMessage ? (
+        <InfoBox tone={actionStatus === "error" ? "error" : actionStatus === "warning" ? "warning" : "success"}>
+          {actionMessage}
+        </InfoBox>
+      ) : null}
+
       <div className="dashboard-project-badge-row">
         <Badge tone="success">{`${project.name} - ${project.target_location}`}</Badge>
       </div>
@@ -527,11 +535,13 @@ export default async function ProjectDashboardView({
                       </a>
                       <form action={unlinkProjectSheetAction}>
                         <input type="hidden" name="project_id" value={project.id} />
+                        <input type="hidden" name="return_to" value={buildHref(params, { tab: "settings" })} />
                         <button type="submit" className="button-secondary">Unlink Sheet</button>
                       </form>
                     </div>
                     <form action={deleteProjectSheetAction} className="dashboard-sheet-delete-form">
                       <input type="hidden" name="project_id" value={project.id} />
+                      <input type="hidden" name="return_to" value={buildHref(params, { tab: "settings" })} />
                       <div className="dashboard-delete-row">
                         <label className="workspace-toggle dashboard-sheet-confirm">
                           <span className="workspace-toggle__control">
@@ -546,6 +556,7 @@ export default async function ProjectDashboardView({
                 ) : (
                   <form action={createProjectSheetAction}>
                     <input type="hidden" name="project_id" value={project.id} />
+                    <input type="hidden" name="return_to" value={buildHref(params, { tab: "settings" })} />
                     <button type="submit">Create Google Sheet</button>
                   </form>
                 )}
@@ -828,6 +839,7 @@ export default async function ProjectDashboardView({
                   {activeKeywordMode === "single" ? (
                     <form action={addKeywordsAction} className="workspace-form dashboard-intake-form">
                       <input type="hidden" name="project_id" value={project.id} />
+                      <input type="hidden" name="return_to" value={buildHref(params, { tab: "keywords" })} />
                       <label className="workspace-form__field">
                         <span className="eyebrow">Keyword</span>
                         <input name="keywords" placeholder="seo tools" />
@@ -839,6 +851,7 @@ export default async function ProjectDashboardView({
                   ) : (
                     <form action={addKeywordsAction} className="workspace-form dashboard-intake-form">
                       <input type="hidden" name="project_id" value={project.id} />
+                      <input type="hidden" name="return_to" value={buildHref(params, { tab: "keywords" })} />
                       <label className="workspace-form__field">
                         <span className="eyebrow">Keywords</span>
                         <textarea name="keywords" className="workspace-textarea dashboard-keywords-textarea" placeholder={"keyword one\nkeyword two\nkeyword three"} />
@@ -856,6 +869,7 @@ export default async function ProjectDashboardView({
                 <div className="dashboard-import-shell">
                   <form action={importKeywordsCsvAction} className="workspace-form dashboard-import-form">
                     <input type="hidden" name="project_id" value={project.id} />
+                    <input type="hidden" name="return_to" value={buildHref(params, { tab: "keywords" })} />
                     <label className="workspace-form__field">
                       <span className="dashboard-upload-label">Choose CSV file</span>
                       <div className="dashboard-upload-box">
@@ -899,6 +913,7 @@ export default async function ProjectDashboardView({
                   {project.google_sheet_id ? (
                     <form action={syncRankingsSheetAction}>
                       <input type="hidden" name="project_id" value={project.id} />
+                      <input type="hidden" name="return_to" value={buildHref(params, { tab: "keywords" })} />
                       <button type="submit">Sync Now</button>
                     </form>
                   ) : (
@@ -911,6 +926,8 @@ export default async function ProjectDashboardView({
                 <Badge tone="warning">Delete</Badge>
                 {keywords.length ? (
                   <form action={deleteKeywordsAction} className="dashboard-selection-form dashboard-bulk-delete-form">
+                    <input type="hidden" name="project_id" value={project.id} />
+                    <input type="hidden" name="return_to" value={buildHref(params, { tab: "keywords" })} />
                     <label className="workspace-form__field">
                       <span className="dashboard-field-label">Select keywords to delete</span>
                       <MultiSelectDropdown
@@ -982,6 +999,7 @@ export default async function ProjectDashboardView({
                 </form>
                 <form action={syncRankingsSheetAction}>
                   <input type="hidden" name="project_id" value={project.id} />
+                  <input type="hidden" name="return_to" value={buildHref(params, { tab: "rank" })} />
                   <button type="submit" className="button-secondary">Sync to Sheets</button>
                 </form>
               </div>
@@ -1123,6 +1141,7 @@ export default async function ProjectDashboardView({
                   <div className="dashboard-action-stack">
                     <form action={fetchLiveGscAction} className="workspace-form">
                       <input type="hidden" name="project_id" value={project.id} />
+                      <input type="hidden" name="return_to" value={buildHref(params, { tab: "search" })} />
                       <input type="hidden" name="property" value={selectedProperty} />
                       <input type="hidden" name="start_date" value={presetRange.start} />
                       <input type="hidden" name="end_date" value={presetRange.end} />
@@ -1138,6 +1157,7 @@ export default async function ProjectDashboardView({
                     </form>
                     <form action={clearProjectGscAction}>
                       <input type="hidden" name="project_id" value={project.id} />
+                      <input type="hidden" name="return_to" value={buildHref(params, { tab: "search" })} />
                       <button type="submit" className="button-secondary">Reset Data</button>
                     </form>
                   </div>
@@ -1173,6 +1193,7 @@ export default async function ProjectDashboardView({
                       />
                         <form action={addKeywordsAction} className="dashboard-selection-form dashboard-selection-form--inline">
                           <input type="hidden" name="project_id" value={project.id} />
+                          <input type="hidden" name="return_to" value={buildHref(params, { tab: "search", search_view: "new" })} />
                           <div className="workspace-form__field dashboard-selection-form__field">
                             <span className="dashboard-selection-label">Select queries to add to keyword list</span>
                             <MultiSelectDropdown name="keywords" options={newDiscoveryOptions} />
@@ -1285,10 +1306,12 @@ export default async function ProjectDashboardView({
                 <div className="dashboard-sheet-actions dashboard-sheet-actions--full">
                   <form action={syncGscSheetAction}>
                     <input type="hidden" name="project_id" value={project.id} />
+                    <input type="hidden" name="return_to" value={buildHref(params, { tab: "search", search_view: activeSearchTab })} />
                     <button type="submit">Sync GSC Queries</button>
                   </form>
                   <form action={syncCannibalizationSheetAction}>
                     <input type="hidden" name="project_id" value={project.id} />
+                    <input type="hidden" name="return_to" value={buildHref(params, { tab: "search", search_view: activeSearchTab })} />
                     <button type="submit" className="button-secondary">Sync Cannibalization</button>
                   </form>
                 </div>
@@ -1327,6 +1350,7 @@ export default async function ProjectDashboardView({
                       />
                         <form action={addKeywordsAction} className="dashboard-selection-form dashboard-selection-form--inline">
                           <input type="hidden" name="project_id" value={project.id} />
+                          <input type="hidden" name="return_to" value={buildHref(params, { tab: "search", search_view: "opportunities" })} />
                           <div className="workspace-form__field dashboard-selection-form__field">
                             <span className="dashboard-selection-label">Select queries to add to keyword list</span>
                             <MultiSelectDropdown name="keywords" options={newDiscoveryOptions} />
@@ -1381,10 +1405,12 @@ export default async function ProjectDashboardView({
                 <div className="dashboard-sheet-actions dashboard-sheet-actions--full">
                   <form action={syncGscSheetAction}>
                     <input type="hidden" name="project_id" value={project.id} />
+                    <input type="hidden" name="return_to" value={buildHref(params, { tab: "search", search_view: activeSearchTab })} />
                     <button type="submit">Sync GSC Queries</button>
                   </form>
                   <form action={syncCannibalizationSheetAction}>
                     <input type="hidden" name="project_id" value={project.id} />
+                    <input type="hidden" name="return_to" value={buildHref(params, { tab: "search", search_view: activeSearchTab })} />
                     <button type="submit" className="button-secondary">Sync Cannibalization</button>
                   </form>
                 </div>
@@ -1487,6 +1513,7 @@ export default async function ProjectDashboardView({
                                   <input type="hidden" name="project_id" value={project.id} />
                                   <input type="hidden" name="keyword" value={item.query} />
                                   <input type="hidden" name="mode" value="resolve" />
+                                  <input type="hidden" name="return_to" value={buildHref(params, { tab: "cannibalization", cannibal_view: activeCannibalizationTab, tracked_view: activeTrackedTab })} />
                                   <label className="workspace-form__field">
                                     <span className="eyebrow">Resolution notes (optional)</span>
                                     <input name="notes" placeholder="Merged content and redirected supporting pages" />
@@ -1525,6 +1552,7 @@ export default async function ProjectDashboardView({
                                   <input type="hidden" name="project_id" value={project.id} />
                                   <input type="hidden" name="keyword" value={item.query} />
                                   <input type="hidden" name="mode" value="unresolve" />
+                                  <input type="hidden" name="return_to" value={buildHref(params, { tab: "cannibalization", cannibal_view: activeCannibalizationTab, tracked_view: activeTrackedTab })} />
                                   <button type="submit" className="button-secondary">Unmark as Resolved</button>
                                 </form>
                               </div>
@@ -1564,6 +1592,7 @@ export default async function ProjectDashboardView({
         <Panel title="Project Settings" description="Edit the core details for this project">
           <form action={updateProjectAction} className="workspace-form">
             <input type="hidden" name="id" value={project.id} />
+            <input type="hidden" name="return_to" value={buildHref(params, { tab: "settings" })} />
             <div className="surface-grid-2 dashboard-settings-grid">
               <label className="workspace-form__field">
                 <span className="eyebrow">Name</span>

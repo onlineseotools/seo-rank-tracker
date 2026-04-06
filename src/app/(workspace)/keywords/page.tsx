@@ -1,5 +1,5 @@
 import { ProjectPicker } from "@/components/project-picker";
-import { Panel, PageIntro, Pill } from "@/components/ui";
+import { InfoBox, Panel, PageIntro, Pill } from "@/components/ui";
 import { addKeywordsAction, deleteKeywordsAction } from "@/lib/server/actions";
 import { resolveProjectContext } from "@/lib/server/project-context";
 import { getBestRank, getRankingsByProject } from "@/lib/server/repo";
@@ -11,7 +11,11 @@ export default async function KeywordsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await requireSessionUser();
-  const { projects, project } = await resolveProjectContext(user, searchParams, true);
+  const params = await searchParams;
+  const firstParam = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+  const status = firstParam(params.status);
+  const message = firstParam(params.message);
+  const { projects, project } = await resolveProjectContext(user, Promise.resolve(params), true);
   const rankings = project ? getRankingsByProject(project.id, true) : [];
   const keywordRows = rankings.map((row) => ({
     id: row.id,
@@ -33,6 +37,8 @@ export default async function KeywordsPage({
         badge="Keyword portfolio"
       />
 
+      {message ? <InfoBox tone={status === "error" ? "error" : status === "warning" ? "warning" : "success"}>{message}</InfoBox> : null}
+
       <Panel kicker="Scope" title="Project selection" description="Choose the project variant you want to manage before adding or deleting keywords.">
         <ProjectPicker projects={projects} selectedProjectId={project?.id ?? null} />
       </Panel>
@@ -42,6 +48,7 @@ export default async function KeywordsPage({
           {project ? (
             <form action={addKeywordsAction} className="grid gap-4">
               <input type="hidden" name="project_id" value={project.id} />
+              <input type="hidden" name="return_to" value={`/keywords?project=${project.id}`} />
               <div className="panel-soft rounded-[22px] p-4">
                 <div className="eyebrow">Target project</div>
                 <div className="mt-3 text-sm text-[var(--text)]">{project.name}</div>
@@ -93,6 +100,8 @@ export default async function KeywordsPage({
           </div>
           {keywordRows.length ? (
             <form action={deleteKeywordsAction} className="mt-5 flex gap-3">
+              <input type="hidden" name="project_id" value={project?.id ?? ""} />
+              <input type="hidden" name="return_to" value={project ? `/keywords?project=${project.id}` : "/keywords"} />
               <input type="hidden" name="keyword_ids" value={keywordRows.map((row) => row.id).join(",")} />
               <button className="rounded-[18px] border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
                 Delete all shown keywords

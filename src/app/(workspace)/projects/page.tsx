@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Badge, PageIntro, Panel, StatTile, TabLink } from "@/components/ui";
+import { Badge, InfoBox, PageIntro, Panel, StatTile, TabLink } from "@/components/ui";
 import { createProjectAction, deleteProjectAction, updateProjectAction } from "@/lib/server/actions";
 import { getKeywordsByProject, getProjectsForUser, getUserProjectAccess } from "@/lib/server/repo";
 import { requireSessionUser } from "@/lib/server/session";
@@ -19,6 +19,8 @@ export default async function ProjectsPage({
   const params = await searchParams;
   const activeTab = getSingle(params.tab) ?? "all";
   const editingProjectId = Number(getSingle(params.edit) ?? 0);
+  const status = getSingle(params.status);
+  const message = getSingle(params.message);
   const projects = getProjectsForUser(user.id, user.role === "admin", false);
   const accessRows = getUserProjectAccess(user.id);
   const editAccess = new Map(accessRows.map((row) => [row.project_id, Boolean(row.can_edit)]));
@@ -36,6 +38,8 @@ export default async function ProjectsPage({
     <div className="flex flex-col gap-6">
       <PageIntro title="Projects" subtitle="Manage your SEO projects and variants" />
 
+      {message ? <InfoBox tone={status === "error" ? "error" : status === "warning" ? "warning" : "success"}>{message}</InfoBox> : null}
+
       <div className="tab-links">
         <TabLink href="/projects?tab=all" label="All Projects" active={activeTab === "all"} />
         <TabLink href="/projects?tab=create" label="Create New Project" active={activeTab === "create"} />
@@ -44,6 +48,7 @@ export default async function ProjectsPage({
       {activeTab === "create" ? (
         <Panel title="Create New Project" description="Add a new website and location variant to track">
           <form action={createProjectAction} className="grid gap-4">
+            <input type="hidden" name="return_to" value="/projects?tab=create" />
             <div className="surface-grid-2">
               <div className="grid gap-4">
                 <label className="grid gap-2">
@@ -164,6 +169,7 @@ export default async function ProjectsPage({
                                 </Link>
                                 <form action={deleteProjectAction}>
                                   <input type="hidden" name="id" value={project.id} />
+                                  <input type="hidden" name="return_to" value="/projects?tab=all" />
                                   <button type="submit" className="button-secondary" disabled={!canEdit}>
                                     Delete
                                   </button>
@@ -184,6 +190,7 @@ export default async function ProjectsPage({
                           ) : (
                             <form action={updateProjectAction} className="grid gap-4">
                               <input type="hidden" name="id" value={editableProject.id} />
+                              <input type="hidden" name="return_to" value={`/projects?tab=all&edit=${editableProject.id}`} />
                               <div className="surface-grid-3">
                                 <div className="grid gap-4">
                                   <label className="grid gap-2">

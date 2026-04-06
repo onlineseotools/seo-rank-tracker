@@ -38,6 +38,8 @@ export default async function SettingsPage({
   const activeTab = getSingle(params.tab) ?? "serp-apis";
   const logType = getSingle(params.log_type) ?? "All";
   const savedSection = getSingle(params.saved) ?? "";
+  const status = getSingle(params.status) ?? "";
+  const message = getSingle(params.message) ?? "";
 
   const serperKey = (await getSerpSetting(user.id, "serper_api_key")) ?? "";
   const dataForSeoUser = (await getSerpSetting(user.id, "dataforseo_username")) ?? "";
@@ -79,18 +81,33 @@ export default async function SettingsPage({
           <div className="info-box-content">{googleError}</div>
         </div>
       ) : null}
-      {activeTab === "serp-apis" && savedSection ? (
+      {message ? (
+        <div className={`info-box info-box--${status === "error" ? "error" : status === "warning" ? "warning" : "success"}`}>
+          <div className="info-box-content">{message}</div>
+        </div>
+      ) : null}
+      {savedSection ? (
         <div className="info-box info-box--success">
           <div className="info-box-content">
             {savedSection === "serper"
               ? "Serper settings saved."
               : savedSection === "dataforseo"
                 ? "DataForSEO settings saved."
-                : savedSection === "scrapingrobot"
+                  : savedSection === "scrapingrobot"
                   ? "ScrapingRobot settings saved."
                   : savedSection === "default-api"
                     ? "Default SERP API saved."
-                    : "Settings saved."}
+                    : savedSection === "google-files"
+                      ? "Google JSON file saved."
+                      : savedSection === "sheets-disconnected"
+                        ? "Google Sheets connection disconnected."
+                      : savedSection === "gsc-disconnected"
+                          ? "Search Console connection disconnected."
+                          : savedSection === "sync-log-cleared"
+                            ? "Sync logs cleared."
+                            : savedSection === "profile"
+                              ? "Profile updated successfully."
+                            : "Settings saved."}
           </div>
         </div>
       ) : null}
@@ -231,6 +248,7 @@ export default async function SettingsPage({
               <summary className="card-title">OAuth (Recommended)</summary>
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]" style={{ marginTop: "1rem" }}>
                 <form action={saveGoogleFilesAction} className="settings-upload-form settings-card flex h-full flex-col gap-4">
+                  <input type="hidden" name="tab" value="google-sheets" />
                   <label className="grid gap-2">
                     <span className="eyebrow">Upload OAuth Client Secrets JSON</span>
                     <input type="file" name="google_oauth_client_json" accept="application/json" />
@@ -273,6 +291,7 @@ export default async function SettingsPage({
               <summary className="card-title">Service Account (Optional)</summary>
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]" style={{ marginTop: "1rem" }}>
                 <form action={saveGoogleFilesAction} className="settings-upload-form settings-card flex h-full flex-col gap-4">
+                  <input type="hidden" name="tab" value="search-console" />
                   <label className="grid gap-2">
                     <span className="eyebrow">Upload Service Account JSON</span>
                     <input type="file" name="google_service_account_json" accept="application/json" />
@@ -362,6 +381,7 @@ export default async function SettingsPage({
         <Panel title="Application Settings" description="Manage admin account settings">
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] xl:items-start">
             <form id="account-settings-form" action={updateProfileAction} className="grid gap-4">
+              <input type="hidden" name="return_to" value="/settings?tab=app-settings&saved=profile" />
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="grid gap-2">
                   <span className="eyebrow">Username</span>

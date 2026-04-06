@@ -1,5 +1,5 @@
 import { ProjectPicker } from "@/components/project-picker";
-import { Panel, PageIntro, Pill, StatTile } from "@/components/ui";
+import { InfoBox, Panel, PageIntro, Pill, StatTile } from "@/components/ui";
 import { fetchLiveGscAction } from "@/lib/server/actions";
 import {
   analyzePagePerformance,
@@ -32,6 +32,9 @@ export default async function GscAdminPage({
 }) {
   const user = await requireSessionUser();
   const params = await searchParams;
+  const firstParam = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+  const status = firstParam(params.status);
+  const message = firstParam(params.message);
   const { projects, project } = await resolveProjectContext(user, params, false);
   const days = Math.max(7, Number(Array.isArray(params.days) ? params.days[0] : params.days) || 28);
 
@@ -92,6 +95,8 @@ export default async function GscAdminPage({
         badge="GSC Admin"
       />
 
+      {message ? <InfoBox tone={status === "error" ? "error" : status === "warning" ? "warning" : "success"}>{message}</InfoBox> : null}
+
       <Panel kicker="Configuration" title="Project and property selection" description="Choose the project, verified Search Console property, and analysis window before loading the live comparison.">
         <div className="grid gap-4 lg:grid-cols-[0.8fr,1.2fr]">
           <ProjectPicker projects={projects} selectedProjectId={project?.id ?? null} />
@@ -124,6 +129,7 @@ export default async function GscAdminPage({
         {project && selectedProperty ? (
           <form action={fetchLiveGscAction} className="mt-4 flex flex-wrap gap-3">
             <input type="hidden" name="project_id" value={project.id} />
+            <input type="hidden" name="return_to" value={`/gsc-admin?project=${project.id}&property=${encodeURIComponent(selectedProperty)}&days=${days}`} />
             <input type="hidden" name="property" value={selectedProperty} />
             <input type="hidden" name="start_date" value={getDateRange(days).start} />
             <input type="hidden" name="end_date" value={getDateRange(days).end} />

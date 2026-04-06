@@ -1,5 +1,5 @@
 import { ProjectPicker } from "@/components/project-picker";
-import { Panel, PageIntro, Pill } from "@/components/ui";
+import { InfoBox, Panel, PageIntro, Pill } from "@/components/ui";
 import { fetchLiveGscAction, importGscDataAction } from "@/lib/server/actions";
 import { findOpportunities } from "@/lib/server/analytics";
 import { listGscProperties } from "@/lib/server/google";
@@ -14,7 +14,11 @@ export default async function SearchConsolePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await requireSessionUser();
-  const { projects, project } = await resolveProjectContext(user, searchParams, true);
+  const params = await searchParams;
+  const firstParam = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+  const status = firstParam(params.status);
+  const message = firstParam(params.message);
+  const { projects, project } = await resolveProjectContext(user, Promise.resolve(params), true);
   const gscRows = project ? getGscQueries(project.id) : [];
   const opportunities = findOpportunities(gscRows);
   const discoveries = project ? getNewGscDiscoveries(project.id) : [];
@@ -36,6 +40,8 @@ export default async function SearchConsolePage({
         subtitle="Stored Search Console rows are surfaced directly from the tracker database. You can also import fresh GSC JSON payloads into the selected project."
         badge="Search Console"
       />
+
+      {message ? <InfoBox tone={status === "error" ? "error" : status === "warning" ? "warning" : "success"}>{message}</InfoBox> : null}
 
       <Panel kicker="Scope" title="Project selection" description="Switch between project variants before importing or analyzing Search Console query data.">
         <ProjectPicker projects={projects} selectedProjectId={project?.id ?? null} />
@@ -60,6 +66,7 @@ export default async function SearchConsolePage({
             {project ? (
               <form action={fetchLiveGscAction} className="panel-soft rounded-[22px] p-5">
                 <input type="hidden" name="project_id" value={project.id} />
+                <input type="hidden" name="return_to" value={`/search-console?project=${project.id}`} />
                 <div className="eyebrow">Fetch live GSC rows</div>
                 <div className="mt-3 grid gap-3">
                   <select
@@ -88,6 +95,7 @@ export default async function SearchConsolePage({
             {project ? (
               <form action={importGscDataAction} className="panel-soft rounded-[22px] p-5">
                 <input type="hidden" name="project_id" value={project.id} />
+                <input type="hidden" name="return_to" value={`/search-console?project=${project.id}`} />
                 <div className="eyebrow">Import GSC JSON</div>
                 <textarea
                   name="payload"

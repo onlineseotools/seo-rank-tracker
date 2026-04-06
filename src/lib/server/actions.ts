@@ -70,6 +70,15 @@ function withStatusParams(target: string, params: Record<string, string>) {
   return query ? `${pathname}?${query}` : pathname;
 }
 
+function redirectWithStatus(
+  rawTarget: string | FormDataEntryValue | null,
+  fallback: string,
+  params: Record<string, string>,
+): never {
+  const target = buildSafeRedirectTarget(String(rawTarget ?? ""), fallback);
+  redirect(withStatusParams(target, params));
+}
+
 export async function loginAction(formData: FormData) {
   const login = String(formData.get("login") ?? "").trim();
   const password = String(formData.get("password") ?? "");
@@ -91,31 +100,45 @@ export async function logoutAction() {
 
 export async function createProjectAction(formData: FormData) {
   const user = await requireSessionUser();
+  const returnTo = String(formData.get("return_to") ?? "/projects?tab=create");
   const name = String(formData.get("name") ?? "").trim();
   const url = String(formData.get("url") ?? "").trim();
   const target_location = String(formData.get("target_location") ?? "").trim();
   const update_frequency = String(formData.get("update_frequency") ?? "monthly");
   const gsc_property = String(formData.get("gsc_property") ?? "").trim() || null;
   const shouldCreateSheet = formData.get("create_sheet") === "on";
-  if (name && url && target_location) {
-    const projectId = createProject({ name, url, target_location, update_frequency, gsc_property });
-    if (shouldCreateSheet) {
-      try {
-        const baseUrl = await getBaseUrl();
-        await createProjectSheet(user.id, baseUrl, name, projectId);
-      } catch {
-        // Keep project creation successful even if Google Sheets setup is unavailable.
-      }
+  if (!name || !url || !target_location) {
+    redirectWithStatus(returnTo, "/projects?tab=create", {
+      status: "error",
+      message: "Project name, website URL, and target location are required.",
+    });
+  }
+
+  const projectId = createProject({ name, url, target_location, update_frequency, gsc_property });
+  let sheetStatus = "";
+  if (shouldCreateSheet) {
+    try {
+      const baseUrl = await getBaseUrl();
+      await createProjectSheet(user.id, baseUrl, name, projectId);
+      sheetStatus = " Google Sheet linked.";
+    } catch {
+      sheetStatus = " Project created, but Google Sheet setup could not be completed.";
     }
   }
   revalidatePath("/projects");
   revalidatePath("/project-dashboard");
+  redirectWithStatus("/projects?tab=all", "/projects?tab=all", {
+    status: sheetStatus.includes("could not") ? "warning" : "success",
+    message: `Project created successfully.${sheetStatus}`.trim(),
+  });
 }
 
 export async function updateProjectAction(formData: FormData) {
   await requireSessionUser();
+  const projectId = Number(formData.get("id"));
+  const returnTo = String(formData.get("return_to") ?? `/projects?tab=all&edit=${projectId}`);
   updateProject({
-    id: Number(formData.get("id")),
+    id: projectId,
     name: String(formData.get("name") ?? ""),
     url: String(formData.get("url") ?? ""),
     target_location: String(formData.get("target_location") ?? ""),
@@ -127,19 +150,30 @@ export async function updateProjectAction(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/project-dashboard");
   revalidatePath("/search-console");
+  redirectWithStatus(returnTo, `/projects?tab=all&edit=${projectId}`, {
+    status: "success",
+    message: "Project details saved.",
+  });
 }
 
 export async function deleteProjectAction(formData: FormData) {
   await requireSessionUser();
-  deleteProject(Number(formData.get("id")));
+  const projectId = Number(formData.get("id"));
+  const returnTo = String(formData.get("return_to") ?? "/projects?tab=all");
+  deleteProject(projectId);
   revalidatePath("/projects");
   revalidatePath("/dashboard");
   revalidatePath("/project-dashboard");
+  redirectWithStatus(returnTo, "/projects?tab=all", {
+    status: "success",
+    message: "Project deleted.",
+  });
 }
 
 export async function addKeywordsAction(formData: FormData) {
   await requireSessionUser();
   const projectId = Number(formData.get("project_id"));
+  const returnTo = String(formData.get("return_to") ?? (projectId ? `/project-dashboard?project=${projectId}&tab=keywords` : "/keywords"));
   const raw = String(formData.get("keywords") ?? "");
   const fieldKeywords = formData
     .getAll("keywords")
@@ -148,34 +182,64 @@ export async function addKeywordsAction(formData: FormData) {
   const keywords = [...fieldKeywords, ...raw.split(/\r?\n|,/)]
     .map((item) => item.trim())
     .filter(Boolean);
-  if (projectId && keywords.length > 0) {
-    createKeywordsBulk(projectId, [...new Set(keywords)]);
+  if (!projectId) {
+    redirectWithStatus(returnTo, "/keywords", {
+      status: "error",
+      message: "Select a project before adding keywords.",
+    });
   }
+  if (keywords.length === 0) {
+    redirectWithStatus(returnTo, "/keywords", {
+      status: "warning",
+      message: "Enter at least one keyword first.",
+    });
+  }
+  const uniqueKeywords = [...new Set(keywords)];
+  createKeywordsBulk(projectId, uniqueKeywords);
   revalidatePath("/keywords");
   revalidatePath("/dashboard");
   revalidatePath("/project-dashboard");
+  redirectWithStatus(returnTo, "/keywords", {
+    status: "success",
+    message: `Added ${uniqueKeywords.length} keyword${uniqueKeywords.length === 1 ? "" : "s"}.`,
+  });
 }
 
 export async function deleteKeywordsAction(formData: FormData) {
   await requireSessionUser();
+  const projectId = Number(formData.get("project_id"));
+  const returnTo = String(formData.get("return_to") ?? (projectId ? `/project-dashboard?project=${projectId}&tab=keywords` : "/keywords"));
   const ids = [...formData.getAll("keyword_ids").map((value) => String(value ?? "")), String(formData.get("keyword_ids") ?? "")]
     .flatMap((value) => value.split(","))
     .map((value) => Number(value))
     .filter((value) => Number.isFinite(value) && value > 0);
+  if (!ids.length) {
+    redirectWithStatus(returnTo, "/keywords", {
+      status: "warning",
+      message: "Select at least one keyword to delete.",
+    });
+  }
   deleteKeywordsBulk(ids);
   revalidatePath("/keywords");
   revalidatePath("/dashboard");
   revalidatePath("/project-dashboard");
+  redirectWithStatus(returnTo, "/keywords", {
+    status: "success",
+    message: `Deleted ${ids.length} keyword${ids.length === 1 ? "" : "s"}.`,
+  });
 }
 
 export async function importKeywordsCsvAction(formData: FormData) {
   await requireSessionUser();
   const projectId = Number(formData.get("project_id"));
+  const returnTo = String(formData.get("return_to") ?? `/project-dashboard?project=${projectId}&tab=keywords`);
   const file = formData.get("csv_file");
 
   if (!projectId || !(file instanceof File) || file.size === 0) {
-    revalidatePath("/project-dashboard");
-    return;
+    redirectWithStatus(returnTo, "/project-dashboard?tab=keywords", {
+      status: "warning",
+      message: "Choose a CSV file before importing keywords.",
+    });
   }
 
   const text = await file.text();
@@ -185,14 +249,19 @@ export async function importKeywordsCsvAction(formData: FormData) {
     .filter(Boolean);
 
   if (lines.length < 2) {
-    revalidatePath("/project-dashboard");
-    return;
+    redirectWithStatus(returnTo, "/project-dashboard?tab=keywords", {
+      status: "warning",
+      message: "CSV file is empty or missing keyword rows.",
+    });
   }
 
   const headers = lines[0].split(",").map((value) => value.trim().toLowerCase());
   const keywordIndex = headers.findIndex((header) => header === "keyword");
   if (keywordIndex === -1) {
-    redirect("/project-dashboard?tab=keywords&error=missing-keyword-column");
+    redirectWithStatus(returnTo, "/project-dashboard?tab=keywords", {
+      status: "error",
+      message: 'CSV must contain a "keyword" column.',
+    });
   }
 
   const keywords = lines
@@ -209,6 +278,10 @@ export async function importKeywordsCsvAction(formData: FormData) {
 
   revalidatePath("/keywords");
   revalidatePath("/project-dashboard");
+  redirectWithStatus(returnTo, "/project-dashboard?tab=keywords", {
+    status: "success",
+    message: `Imported ${keywords.length} keyword${keywords.length === 1 ? "" : "s"} from CSV.`,
+  });
 }
 
 export async function createUserAction(formData: FormData) {
@@ -218,16 +291,21 @@ export async function createUserAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const role = String(formData.get("role") ?? "user") as "admin" | "user";
-  if (username && password) {
-    createUser({ username, email, password, role });
+  if (!username || !password) {
+    redirect("/users?tab=management&status=error&message=Username+and+password+are+required.");
   }
+  createUser({ username, email, password, role });
   revalidatePath("/users");
+  redirect(`/users?tab=management&status=success&message=${encodeURIComponent("User created successfully.")}`);
 }
 
 export async function updateUserAction(formData: FormData) {
   const currentUser = await requireSessionUser();
   if (currentUser.role !== "admin") redirect("/dashboard");
   const userId = Number(formData.get("id"));
+  const isAccessUpdate = formData.has("access_update") || formData.has("project_ids") || formData.has("can_edit");
+  const selectedUser = String(formData.get("selected_user") ?? "");
+  const selectedAccessUser = String(formData.get("selected_access_user") ?? "");
   updateUser({
     id: userId,
     username: String(formData.get("username") ?? ""),
@@ -244,11 +322,19 @@ export async function updateUserAction(formData: FormData) {
     .flatMap((value) => String(value ?? "").split(","))
     .map((value) => Number(value))
     .filter((value) => Number.isFinite(value) && value > 0);
-  if (formData.has("access_update") || formData.has("project_ids") || formData.has("can_edit")) {
+  if (isAccessUpdate) {
     const canEdit = formData.get("can_edit") === "on";
     setUserProjectAccess(userId, assigned, canEdit);
   }
   revalidatePath("/users");
+  if (isAccessUpdate) {
+    redirect(
+      `/users?tab=access&access_user=${encodeURIComponent(selectedAccessUser)}&status=success&message=${encodeURIComponent("Access settings saved.")}`,
+    );
+  }
+  redirect(
+    `/users?tab=management&user=${encodeURIComponent(selectedUser || String(formData.get("username") ?? ""))}&status=success&message=${encodeURIComponent("User updated successfully.")}`,
+  );
 }
 
 export async function deleteUserAction(formData: FormData) {
@@ -259,6 +345,7 @@ export async function deleteUserAction(formData: FormData) {
     deleteUser(userId);
   }
   revalidatePath("/users");
+  redirect(`/users?tab=management&status=success&message=${encodeURIComponent("User deleted.")}`);
 }
 
 export async function saveSettingsAction(formData: FormData) {
@@ -288,10 +375,12 @@ export async function clearSyncLogsAction() {
   }
   clearSyncLogs();
   revalidatePath("/settings");
+  redirect("/settings?tab=sync-log&saved=sync-log-cleared");
 }
 
 export async function updateProfileAction(formData: FormData) {
   const user = await requireSessionUser();
+  const returnTo = String(formData.get("return_to") ?? "/users?tab=profile");
   updateUser({
     id: user.id,
     username: String(formData.get("username") ?? "").trim(),
@@ -307,26 +396,36 @@ export async function updateProfileAction(formData: FormData) {
 
   revalidatePath("/settings");
   revalidatePath("/users");
+  redirectWithStatus(returnTo, "/users?tab=profile", {
+    status: "success",
+    message: "Profile updated successfully.",
+  });
 }
 
 export async function saveGoogleFilesAction(formData: FormData) {
   const user = await requireSessionUser();
+  const tab = String(formData.get("tab") ?? "google-sheets");
   const oauthFile = formData.get("google_oauth_client_json");
   const serviceAccountFile = formData.get("google_service_account_json");
 
-  if (oauthFile instanceof File && oauthFile.size > 0) {
-    const text = await oauthFile.text();
-    JSON.parse(text);
-    storeGoogleJsonSetting(user.id, "google_oauth_client_json", text);
-  }
+  try {
+    if (oauthFile instanceof File && oauthFile.size > 0) {
+      const text = await oauthFile.text();
+      JSON.parse(text);
+      storeGoogleJsonSetting(user.id, "google_oauth_client_json", text);
+    }
 
-  if (serviceAccountFile instanceof File && serviceAccountFile.size > 0) {
-    const text = await serviceAccountFile.text();
-    JSON.parse(text);
-    storeGoogleJsonSetting(user.id, "google_service_account_json", text);
+    if (serviceAccountFile instanceof File && serviceAccountFile.size > 0) {
+      const text = await serviceAccountFile.text();
+      JSON.parse(text);
+      storeGoogleJsonSetting(user.id, "google_service_account_json", text);
+    }
+  } catch {
+    redirect(`/settings?tab=${encodeURIComponent(tab)}&google_error=invalid-json-file`);
   }
 
   revalidatePath("/settings");
+  redirect(`/settings?tab=${encodeURIComponent(tab)}&saved=google-files`);
 }
 
 export async function connectGoogleProviderAction(formData: FormData) {
@@ -358,18 +457,28 @@ export async function disconnectGoogleProviderAction(formData: FormData) {
     disconnectGoogleProvider(user.id, provider);
   }
   revalidatePath("/settings");
+  redirect(`/settings?tab=${provider === "gsc" ? "search-console" : "google-sheets"}&saved=${provider}-disconnected`);
 }
 
 export async function importGscDataAction(formData: FormData) {
   await requireSessionUser();
   const projectId = Number(formData.get("project_id"));
+  const returnTo = String(formData.get("return_to") ?? (projectId ? `/project-dashboard?project=${projectId}&tab=search` : "/search-console"));
   const payload = String(formData.get("payload") ?? "").trim();
-  if (!projectId || !payload) return;
+  if (!projectId || !payload) {
+    redirectWithStatus(returnTo, "/search-console", {
+      status: "warning",
+      message: "Paste a JSON payload before importing GSC data.",
+    });
+  }
   let rows: Array<Record<string, unknown>> = [];
   try {
     rows = JSON.parse(payload) as Array<Record<string, unknown>>;
   } catch {
-    redirect(`/search-console?error=invalid-json`);
+    redirectWithStatus(returnTo, "/search-console", {
+      status: "error",
+      message: "Invalid JSON payload. Please check the format and try again.",
+    });
   }
   clearGscQueries(projectId);
   for (const row of rows) {
@@ -389,22 +498,38 @@ export async function importGscDataAction(formData: FormData) {
   revalidatePath("/search-console");
   revalidatePath("/cannibalization");
   revalidatePath("/project-dashboard");
+  redirectWithStatus(returnTo, "/search-console", {
+    status: "success",
+    message: `Imported ${rows.length} Search Console row${rows.length === 1 ? "" : "s"}.`,
+  });
 }
 
 export async function fetchLiveGscAction(formData: FormData) {
   const user = await requireSessionUser();
   const projectId = Number(formData.get("project_id"));
+  const returnTo = String(formData.get("return_to") ?? (projectId ? `/project-dashboard?project=${projectId}&tab=search` : "/search-console"));
   const property =
     String(formData.get("property_override") ?? "").trim() || String(formData.get("property") ?? "").trim();
   const startDate = String(formData.get("start_date") ?? "").trim();
   const endDate = String(formData.get("end_date") ?? "").trim();
   const includePage = formData.get("include_page") === "on";
   if (!projectId || !property || !startDate || !endDate) {
-    redirect("/search-console?error=missing-gsc-inputs");
+    redirectWithStatus(returnTo, "/search-console", {
+      status: "error",
+      message: "Property, start date, and end date are required to fetch live GSC data.",
+    });
   }
 
   const baseUrl = await getBaseUrl();
-  const rows = await fetchGscQueries(user.id, baseUrl, property, startDate, endDate, includePage);
+  let rows;
+  try {
+    rows = await fetchGscQueries(user.id, baseUrl, property, startDate, endDate, includePage);
+  } catch (error) {
+    redirectWithStatus(returnTo, "/search-console", {
+      status: "error",
+      message: error instanceof Error ? error.message : "Unable to fetch data from Google Search Console.",
+    });
+  }
   clearGscQueries(projectId);
   for (const row of rows) {
     createGscQuery({
@@ -424,11 +549,16 @@ export async function fetchLiveGscAction(formData: FormData) {
   revalidatePath("/cannibalization");
   revalidatePath("/gsc-admin");
   revalidatePath("/project-dashboard");
+  redirectWithStatus(returnTo, "/search-console", {
+    status: "success",
+    message: `Fetched ${rows.length} Search Console row${rows.length === 1 ? "" : "s"} from Google Search Console.`,
+  });
 }
 
 export async function clearProjectGscAction(formData: FormData) {
   await requireSessionUser();
   const projectId = Number(formData.get("project_id"));
+  const returnTo = String(formData.get("return_to") ?? (projectId ? `/project-dashboard?project=${projectId}&tab=search` : "/search-console"));
   if (projectId) {
     clearGscQueries(projectId);
     addSyncLog(projectId, "gsc_import", "success", "Cleared stored Google Search Console rows");
@@ -437,6 +567,10 @@ export async function clearProjectGscAction(formData: FormData) {
   revalidatePath("/cannibalization");
   revalidatePath("/gsc-admin");
   revalidatePath("/project-dashboard");
+  redirectWithStatus(returnTo, "/search-console", {
+    status: "success",
+    message: "Stored Search Console data cleared.",
+  });
 }
 
 export async function markCannibalizationAction(formData: FormData) {
@@ -444,6 +578,7 @@ export async function markCannibalizationAction(formData: FormData) {
   const projectId = Number(formData.get("project_id"));
   const keyword = String(formData.get("keyword") ?? "");
   const mode = String(formData.get("mode") ?? "resolve");
+  const returnTo = String(formData.get("return_to") ?? (projectId ? `/project-dashboard?project=${projectId}&tab=cannibalization` : "/cannibalization"));
   const notes = String(formData.get("notes") ?? "").trim();
   if (mode === "resolve") {
     markCannibalizationResolved(projectId, keyword, notes || undefined);
@@ -452,76 +587,177 @@ export async function markCannibalizationAction(formData: FormData) {
   }
   revalidatePath("/cannibalization");
   revalidatePath("/project-dashboard");
+  redirectWithStatus(returnTo, "/cannibalization", {
+    status: "success",
+    message: mode === "resolve" ? "Cannibalization case marked as resolved." : "Cannibalization case restored.",
+  });
 }
 
 export async function createProjectSheetAction(formData: FormData) {
   const user = await requireSessionUser();
   const projectId = Number(formData.get("project_id"));
+  const returnTo = String(formData.get("return_to") ?? `/project-dashboard?project=${projectId}&tab=settings`);
   const project = getProjectById(projectId);
-  if (!project) return;
+  if (!project) {
+    redirectWithStatus(returnTo, "/project-dashboard?tab=settings", {
+      status: "error",
+      message: "Project not found.",
+    });
+  }
   const baseUrl = await getBaseUrl();
-  await createProjectSheet(user.id, baseUrl, project.name, project.id);
+  try {
+    await createProjectSheet(user.id, baseUrl, project.name, project.id);
+  } catch (error) {
+    redirectWithStatus(returnTo, "/project-dashboard?tab=settings", {
+      status: "error",
+      message: error instanceof Error ? error.message : "Unable to create Google Sheet.",
+    });
+  }
   revalidatePath("/project-dashboard");
   revalidatePath("/settings");
   revalidatePath("/projects");
+  redirectWithStatus(returnTo, "/project-dashboard?tab=settings", {
+    status: "success",
+    message: "Google Sheet created and linked to the project.",
+  });
 }
 
 export async function deleteProjectSheetAction(formData: FormData) {
   const user = await requireSessionUser();
   const projectId = Number(formData.get("project_id"));
+  const returnTo = String(formData.get("return_to") ?? `/project-dashboard?project=${projectId}&tab=settings`);
   if (formData.get("confirm_delete_sheet") !== "on") {
-    revalidatePath("/project-dashboard");
-    return;
+    redirectWithStatus(returnTo, "/project-dashboard?tab=settings", {
+      status: "warning",
+      message: "Confirm sheet deletion before removing the Google Sheet.",
+    });
   }
   const { sheetId } = getProjectSheetState(projectId);
-  if (!sheetId) return;
+  if (!sheetId) {
+    redirectWithStatus(returnTo, "/project-dashboard?tab=settings", {
+      status: "warning",
+      message: "No Google Sheet is linked to this project.",
+    });
+  }
   const baseUrl = await getBaseUrl();
-  await deleteProjectSheet(user.id, baseUrl, sheetId, projectId);
+  try {
+    await deleteProjectSheet(user.id, baseUrl, sheetId, projectId);
+  } catch (error) {
+    redirectWithStatus(returnTo, "/project-dashboard?tab=settings", {
+      status: "error",
+      message: error instanceof Error ? error.message : "Unable to delete the linked Google Sheet.",
+    });
+  }
   revalidatePath("/project-dashboard");
   revalidatePath("/projects");
+  redirectWithStatus(returnTo, "/project-dashboard?tab=settings", {
+    status: "success",
+    message: "Linked Google Sheet deleted.",
+  });
 }
 
 export async function unlinkProjectSheetAction(formData: FormData) {
   await requireSessionUser();
   const projectId = Number(formData.get("project_id"));
-  if (!projectId) return;
+  const returnTo = String(formData.get("return_to") ?? `/project-dashboard?project=${projectId}&tab=settings`);
+  if (!projectId) {
+    redirectWithStatus(returnTo, "/project-dashboard?tab=settings", {
+      status: "error",
+      message: "Project not found.",
+    });
+  }
   setProjectSheetLinks(projectId, null, null);
   addSyncLog(projectId, "sheet_link", "success", "Unlinked Google Sheet from project");
   revalidatePath("/project-dashboard");
   revalidatePath("/projects");
+  redirectWithStatus(returnTo, "/project-dashboard?tab=settings", {
+    status: "success",
+    message: "Google Sheet unlinked from this project.",
+  });
 }
 
 export async function syncRankingsSheetAction(formData: FormData) {
   const user = await requireSessionUser();
   const projectId = Number(formData.get("project_id"));
+  const returnTo = String(formData.get("return_to") ?? `/project-dashboard?project=${projectId}&tab=keywords`);
   const { sheetId } = getProjectSheetState(projectId);
-  if (!sheetId) return;
+  if (!sheetId) {
+    redirectWithStatus(returnTo, "/project-dashboard", {
+      status: "warning",
+      message: "Link a Google Sheet before syncing rankings.",
+    });
+  }
   const baseUrl = await getBaseUrl();
   const latestRows = getRankingsByProject(projectId, true);
   const historyRows = getRankingsByProject(projectId, false);
-  await syncRankingsToSheet(user.id, baseUrl, sheetId, latestRows, historyRows, projectId);
+  try {
+    await syncRankingsToSheet(user.id, baseUrl, sheetId, latestRows, historyRows, projectId);
+  } catch (error) {
+    redirectWithStatus(returnTo, "/project-dashboard", {
+      status: "error",
+      message: error instanceof Error ? error.message : "Unable to sync rankings to Google Sheets.",
+    });
+  }
   revalidatePath("/project-dashboard");
+  redirectWithStatus(returnTo, "/project-dashboard", {
+    status: "success",
+    message: "Rankings synced to Google Sheets.",
+  });
 }
 
 export async function syncGscSheetAction(formData: FormData) {
   const user = await requireSessionUser();
   const projectId = Number(formData.get("project_id"));
+  const returnTo = String(formData.get("return_to") ?? `/project-dashboard?project=${projectId}&tab=search`);
   const { sheetId } = getProjectSheetState(projectId);
-  if (!sheetId) return;
+  if (!sheetId) {
+    redirectWithStatus(returnTo, "/project-dashboard", {
+      status: "warning",
+      message: "Link a Google Sheet before syncing Search Console data.",
+    });
+  }
   const baseUrl = await getBaseUrl();
-  await syncGscToSheet(user.id, baseUrl, sheetId, getGscQueries(projectId), projectId);
+  try {
+    await syncGscToSheet(user.id, baseUrl, sheetId, getGscQueries(projectId), projectId);
+  } catch (error) {
+    redirectWithStatus(returnTo, "/project-dashboard", {
+      status: "error",
+      message: error instanceof Error ? error.message : "Unable to sync Search Console data to Google Sheets.",
+    });
+  }
   revalidatePath("/project-dashboard");
+  redirectWithStatus(returnTo, "/project-dashboard", {
+    status: "success",
+    message: "Search Console data synced to Google Sheets.",
+  });
 }
 
 export async function syncCannibalizationSheetAction(formData: FormData) {
   const user = await requireSessionUser();
   const projectId = Number(formData.get("project_id"));
+  const returnTo = String(formData.get("return_to") ?? `/project-dashboard?project=${projectId}&tab=search`);
   const { sheetId } = getProjectSheetState(projectId);
-  if (!sheetId) return;
+  if (!sheetId) {
+    redirectWithStatus(returnTo, "/project-dashboard", {
+      status: "warning",
+      message: "Link a Google Sheet before syncing cannibalization data.",
+    });
+  }
   const baseUrl = await getBaseUrl();
   const cases = detectCannibalization(getGscQueries(projectId));
-  await syncCannibalizationToSheet(user.id, baseUrl, sheetId, cases, projectId);
+  try {
+    await syncCannibalizationToSheet(user.id, baseUrl, sheetId, cases, projectId);
+  } catch (error) {
+    redirectWithStatus(returnTo, "/project-dashboard", {
+      status: "error",
+      message: error instanceof Error ? error.message : "Unable to sync cannibalization data to Google Sheets.",
+    });
+  }
   revalidatePath("/project-dashboard");
+  redirectWithStatus(returnTo, "/project-dashboard", {
+    status: "success",
+    message: "Cannibalization report synced to Google Sheets.",
+  });
 }
 
 export async function runRankCheckAction(formData: FormData) {

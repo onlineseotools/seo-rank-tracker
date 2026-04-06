@@ -1,5 +1,5 @@
 import { ProjectPicker } from "@/components/project-picker";
-import { Panel, PageIntro, Pill } from "@/components/ui";
+import { InfoBox, Panel, PageIntro, Pill } from "@/components/ui";
 import { markCannibalizationAction } from "@/lib/server/actions";
 import { detectCannibalization } from "@/lib/server/analytics";
 import { resolveProjectContext } from "@/lib/server/project-context";
@@ -12,7 +12,11 @@ export default async function CannibalizationPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await requireSessionUser();
-  const { projects, project } = await resolveProjectContext(user, searchParams, true);
+  const params = await searchParams;
+  const firstParam = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+  const status = firstParam(params.status);
+  const message = firstParam(params.message);
+  const { projects, project } = await resolveProjectContext(user, Promise.resolve(params), true);
   const rows = project ? getGscQueries(project.id) : [];
   const resolved = new Set((project ? getResolvedCannibalization(project.id) : []).map((item) => item.keyword));
   const cannibalizationCases = detectCannibalization(rows).map((item) => ({
@@ -29,6 +33,8 @@ export default async function CannibalizationPage({
         subtitle="Stored query-page pairs are analyzed the same way as the original tool: multiple pages for the same query are grouped, ranked, and marked resolved when action has been taken."
         badge="Cannibalization"
       />
+
+      {message ? <InfoBox tone={status === "error" ? "error" : status === "warning" ? "warning" : "success"}>{message}</InfoBox> : null}
 
       <Panel kicker="Scope" title="Project selection" description="Review cannibalization one project variant at a time, just like the original workflow.">
         <ProjectPicker projects={projects} selectedProjectId={project?.id ?? null} />
@@ -70,6 +76,7 @@ export default async function CannibalizationPage({
                   <input type="hidden" name="project_id" value={project.id} />
                   <input type="hidden" name="keyword" value={item.query} />
                   <input type="hidden" name="mode" value={item.severity === "Resolved" ? "unresolve" : "resolve"} />
+                  <input type="hidden" name="return_to" value={`/cannibalization?project=${project.id}`} />
                   <button className="text-sm text-[var(--muted)]">
                     {item.severity === "Resolved" ? "Mark active again" : "Mark resolved"}
                   </button>

@@ -1,4 +1,4 @@
-import { DataTable, PageIntro, Panel, TabLink } from "@/components/ui";
+import { DataTable, InfoBox, PageIntro, Panel, TabLink } from "@/components/ui";
 import { PasswordInput } from "@/components/password-input";
 import {
   createUserAction,
@@ -25,6 +25,8 @@ export default async function UsersPage({
   const activeTab = getSingle(params.tab) ?? "profile";
   const selectedUsername = getSingle(params.user) ?? "";
   const selectedAccessUser = getSingle(params.access_user) ?? "";
+  const status = getSingle(params.status);
+  const message = getSingle(params.message);
   const users = listUsers();
   const projects = getAllProjects(false);
   const selectedUser =
@@ -48,6 +50,8 @@ export default async function UsersPage({
     <div className="flex flex-col gap-6">
       <PageIntro title="Users" subtitle="Manage user accounts, access, and profile settings" />
 
+      {message ? <InfoBox tone={status === "error" ? "error" : status === "warning" ? "warning" : "success"}>{message}</InfoBox> : null}
+
       <div className="tab-links">
         {tabs.map((tab) => (
           <TabLink key={tab.key} href={`/users?tab=${tab.key}`} label={tab.label} active={activeTab === tab.key} />
@@ -57,6 +61,7 @@ export default async function UsersPage({
       {activeTab === "profile" ? (
         <Panel title="My Profile" description="Update your account details">
           <form action={updateProfileAction} className="grid gap-4">
+            <input type="hidden" name="return_to" value="/users?tab=profile" />
             <div className="surface-grid-2">
               <label className="grid gap-2">
                 <span className="eyebrow">Username</span>
@@ -191,6 +196,7 @@ export default async function UsersPage({
                   <div className="users-edit-panel">
                     <form action={updateUserAction} className="users-edit-form" id={`users-edit-form-${selectedUser.id}`}>
                       <input type="hidden" name="id" value={selectedUser.id} />
+                      <input type="hidden" name="selected_user" value={selectedUser.username} />
                       <div className="users-edit-grid">
                         <label className="grid gap-2">
                           <span className="eyebrow">Username</span>
@@ -260,6 +266,7 @@ export default async function UsersPage({
               <form action={updateUserAction} className="access-form">
                 <input type="hidden" name="access_update" value="1" />
                 <input type="hidden" name="id" value={accessUser.id} />
+                <input type="hidden" name="selected_access_user" value={accessUser.username} />
                 <input type="hidden" name="username" value={accessUser.username} />
                 <input type="hidden" name="email" value={accessUser.email ?? ""} />
                 <input type="hidden" name="role" value={accessUser.role} />
